@@ -1,0 +1,169 @@
+package com.fm.foodmanagementsystem.modules.auth_service.services.imps;
+
+import com.fm.foodmanagementsystem.core.exception.SystemException;
+import com.fm.foodmanagementsystem.core.exception.enums.SystemErrorCode;
+import com.fm.foodmanagementsystem.core.services.interfaces.IRedisCacheService;
+import com.fm.foodmanagementsystem.modules.auth_service.mappers.UserMapper;
+import com.fm.foodmanagementsystem.modules.auth_service.models.dtos.PendingUserDto;
+import com.fm.foodmanagementsystem.modules.auth_service.models.entities.Role;
+import com.fm.foodmanagementsystem.modules.auth_service.models.entities.User;
+import com.fm.foodmanagementsystem.modules.auth_service.models.repositories.RoleRepository;
+import com.fm.foodmanagementsystem.modules.auth_service.models.repositories.UserRepository;
+import com.fm.foodmanagementsystem.modules.auth_service.resources.requests.*;
+import com.fm.foodmanagementsystem.modules.auth_service.resources.responses.TokenResponse;
+import com.fm.foodmanagementsystem.modules.auth_service.resources.responses.UserResponse;
+import com.fm.foodmanagementsystem.modules.auth_service.services.interfaces.IAuthService;
+import com.fm.foodmanagementsystem.modules.auth_service.services.interfaces.IJwtService;
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jwt.SignedJWT;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.text.ParseException;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.concurrent.TimeUnit;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+public class AuthService implements IAuthService {
+
+    UserRepository userRepository;
+    RoleRepository roleRepository;
+    PasswordEncoder passwordEncoder;
+    IJwtService jwtService;
+    IRedisCacheService redisCacheService;
+    UserMapper userMapper;
+
+    @Override
+    public TokenResponse login(LoginRequest request) {
+        User user = userRepository.findByEmail(request.email())
+                .orElseThrow(() -> new SystemException(SystemErrorCode.USER_NOT_EXISTED));
+
+        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
+            throw new SystemException(SystemErrorCode.UNAUTHENTICATED);
+        }
+
+        // SỬA BỔ SUNG: Truyền cờ rememberMe từ request vào hàm sinh Token
+        JwtService.TokenPair tokenPair = jwtService.generateTokenPair(user, request.rememberMe());
+
+        return TokenResponse.builder()
+                .accessToken(tokenPair.getAccessToken())
+                .refreshToken(tokenPair.getRefreshToken())
+                .authenticated(true)
+                .build();
+    }
+
+    @Override
+    public Map<String, Object> refreshToken(String refreshToken) throws ParseException, JOSEException {
+        return jwtService.refreshToken(refreshToken);
+    }
+
+    @Override
+    public void logout(String token) throws ParseException, JOSEException {
+        SignedJWT signedJWT = SignedJWT.parse(token);
+        jwtService.invalidatedToken(signedJWT);
+    }
+
+    @Override
+    public void registerPendingUser(UserCreationRequest request) {
+        if (userRepository.existsByEmail(request.email())) {
+            throw new SystemException(SystemErrorCode.USER_EXISTED);
+        }
+
+        PendingUserDto pendingUser = PendingUserDto.builder()
+                .email(request.email())
+                .firstName(request.firstName())
+                .lastName(request.lastName())
+                .password(passwordEncoder.encode(request.password()))
+                .phone(request.phone())
+                .dob(request.dob())
+                .roles(request.roles())
+                .build();
+
+        redisCacheService.set("pending_user:" + request.email(), pendingUser, 15, TimeUnit.MINUTES);
+
+        generateAndSendOtp(request.email(), "REGISTER");
+    }
+
+    @Override
+    @Transactional
+    public UserResponse verifyAndCreateUser(VerifyOtpRequest request) {
+        verifyOtp(request.email(), request.otpCode(), "REGISTER");
+
+        PendingUserDto pendingUser = redisCacheService.get("pending_user:" + request.email(), PendingUserDto.class);
+        if (pendingUser == null) {
+            throw new SystemException(SystemErrorCode.USER_NOT_EXISTED);
+        }
+
+        User user = User.builder()
+                .email(pendingUser.getEmail())
+                .password(pendingUser.getPassword())
+                .firstName(pendingUser.getFirstName())
+                .lastName(pendingUser.getLastName())
+                .phone(pendingUser.getPhone())
+                .dob(pendingUser.getDob())
+                .gender(1)
+                .build();
+
+        if (pendingUser.getRoles() != null && !pendingUser.getRoles().isEmpty()) {
+            List<Role> roles = roleRepository.findAllById(pendingUser.getRoles());
+            user.setRoles(new HashSet<>(roles));
+        }
+
+        User savedUser = userRepository.save(user);
+
+        redisCacheService.delete("pending_user:" + request.email());
+        redisCacheService.delete("otp:REGISTER:" + request.email());
+
+        return userMapper.mapToUserResponse(savedUser);
+    }
+
+    @Override
+    public void sendForgotPasswordOTP(String email) {
+        if (!userRepository.existsByEmail(email)) {
+            throw new SystemException(SystemErrorCode.USER_NOT_EXISTED);
+        }
+        generateAndSendOtp(email, "FORGOT_PASSWORD");
+    }
+
+    @Override
+    @Transactional
+    public void resetPassword(NewPasswordRequest request) {
+        verifyOtp(request.email(), request.otpCode(), "FORGOT_PASSWORD");
+
+        User user = userRepository.findByEmail(request.email())
+                .orElseThrow(() -> new SystemException(SystemErrorCode.USER_NOT_EXISTED));
+
+        user.setPassword(passwordEncoder.encode(request.newPassword()));
+        userRepository.save(user);
+
+        redisCacheService.delete("otp:FORGOT_PASSWORD:" + request.email());
+    }
+
+    private void generateAndSendOtp(String email, String type) {
+        String otp = String.format("%06d", new Random().nextInt(999999));
+        String redisKey = "otp:" + type + ":" + email;
+
+        redisCacheService.set(redisKey, otp, 5, TimeUnit.MINUTES);
+        log.info("MÃ OTP CHO {} (Loại: {}) LÀ: {}", email, type, otp);
+    }
+
+    private void verifyOtp(String email, String otpCode, String type) {
+        String redisKey = "otp:" + type + ":" + email;
+        String cachedOtp = redisCacheService.get(redisKey, String.class);
+
+        if (cachedOtp == null || !cachedOtp.equals(otpCode)) {
+            throw new SystemException(SystemErrorCode.UNAUTHENTICATED);
+        }
+    }
+}
