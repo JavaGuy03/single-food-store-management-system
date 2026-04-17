@@ -70,7 +70,14 @@ zalo-pay:
 
 openapi:
   service:
-    url: "http://localhost:9000"
+    url: ${SWAGGER_SERVER_URL:http://localhost:8080}
+
+minio:
+  url: http://localhost:9000
+  # url: http://minio:9000 # (Nếu chạy app trong docker thì dùng cái này)
+  access-key: ${MINIO_ACCESS_KEY}
+  secret-key: ${MINIO_SECRET_KEY}
+  bucket-name: food-media
 
 jwt:
   secret: ${JWT_SECRET}

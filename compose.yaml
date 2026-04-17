@@ -52,5 +52,19 @@ services:
       - "4040:4040" # Mở port 4040 để bạn xem Dashboard quản lý request của ngrok
     depends_on:
       - app
+
+  minio:
+    image: minio/minio:latest
+    container_name: food_minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+#      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY} # Khai báo trong .env (VD: admin)
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY} # Khai báo trong .env (VD: admin123456)
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+      -
 volumes:
   mysql_data:
