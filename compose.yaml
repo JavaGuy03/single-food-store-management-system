@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mysql-db:
     image: mysql:8.0
@@ -11,7 +9,6 @@ services:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-    # Bộ kiểm tra sức khỏe của DB
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
       timeout: 10s
@@ -31,7 +28,7 @@ services:
       - "8080:8080"
     depends_on:
       mysql-db:
-        condition: service_healthy # Chỉ bật app khi DB báo xanh
+        condition: service_healthy
       redis-cache:
         condition: service_started
     env_file:
@@ -42,14 +39,13 @@ services:
     image: ngrok/ngrok:latest
     container_name: food_ngrok
     restart: unless-stopped
-    # Ra lệnh cho ngrok forward traffic HTTP vào service có tên là 'app' ở port 8080
     command:
       - "http"
       - "app:8080"
     environment:
       NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
     ports:
-      - "4040:4040" # Mở port 4040 để bạn xem Dashboard quản lý request của ngrok
+      - "4040:4040"
     depends_on:
       - app
 
@@ -60,11 +56,12 @@ services:
       - "9000:9000"
       - "9001:9001"
     environment:
-#      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY} # Khai báo trong .env (VD: admin)
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY} # Khai báo trong .env (VD: admin123456)
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
     command: server /data --console-address ":9001"
     volumes:
       - minio_data:/data
-      -
+
 volumes:
   mysql_data:
+  minio_data:

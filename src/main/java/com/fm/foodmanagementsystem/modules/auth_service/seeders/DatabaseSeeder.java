@@ -15,7 +15,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Slf4j
-public class DataBaseSeeder implements CommandLineRunner {
+public class DatabaseSeeder implements CommandLineRunner {
 
     RoleRepository roleRepository;
     // Bác có thể inject thêm UserRepository và PasswordEncoder vào đây

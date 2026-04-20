@@ -5,7 +5,6 @@ import com.fm.foodmanagementsystem.modules.auth_service.resources.requests.*;
 import com.fm.foodmanagementsystem.modules.auth_service.resources.responses.TokenResponse;
 import com.fm.foodmanagementsystem.modules.auth_service.resources.responses.UserResponse;
 import com.fm.foodmanagementsystem.modules.auth_service.services.interfaces.IAuthService;
-import com.nimbusds.jose.JOSEException;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +14,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.text.ParseException;
 import java.util.Map;
 
 @RestController
@@ -62,7 +60,7 @@ public class AuthController {
     // =====================================================================
 
     @PostMapping("/register-admin")
-    public ApiResponse<String> registerAdmin(@RequestBody @Valid UserCreationRequest request) {
+    public ApiResponse<String> registerAdmin(@RequestBody @Valid RegisterUserRequest request) {
         authService.registerPendingUser(request, "ADMIN");
 
         return ApiResponse.<String>builder()
@@ -71,7 +69,7 @@ public class AuthController {
     }
 
     @PostMapping("/register-customer")
-    public ApiResponse<String> registerCustomer(@RequestBody @Valid UserCreationRequest request) {
+    public ApiResponse<String> registerCustomer(@RequestBody @Valid RegisterUserRequest request) {
         authService.registerPendingUser(request, "USER");
 
         return ApiResponse.<String>builder()

@@ -83,7 +83,7 @@ public class AuthService implements IAuthService {
     }
 
     @Override
-    public void registerPendingUser(UserCreationRequest request, String roleName) {
+    public void registerPendingUser(RegisterUserRequest request, String roleName) {
         if (userRepository.existsByEmail(request.email())) {
             throw new SystemException(SystemErrorCode.USER_EXISTED);
         }
