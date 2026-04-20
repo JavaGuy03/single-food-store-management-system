@@ -13,10 +13,10 @@ import java.util.Map;
 
 public interface IAuthService {
     TokenResponse login(LoginRequest request);
-    Map<String, Object> refreshToken(String refreshToken) throws ParseException, JOSEException;
-    void logout(String token) throws ParseException, JOSEException;
+    Map<String, Object> refreshToken(String refreshToken);
+    void logout(String token);
 
-    void registerPendingUser(UserCreationRequest request);
+    void registerPendingUser(UserCreationRequest request, String roleName);
     UserResponse verifyAndCreateUser(VerifyOtpRequest request);
 
     void sendForgotPasswordOTP(String email);

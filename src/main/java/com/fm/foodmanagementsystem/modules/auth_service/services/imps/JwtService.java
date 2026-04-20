@@ -101,60 +101,70 @@ public class JwtService implements IJwtService {
     }
 
     @Override
-    public SignedJWT verifyRefreshToken(String token) throws JOSEException, ParseException {
+    public SignedJWT verifyRefreshToken(String token) {
         if (token == null || token.trim().isEmpty()) {
             throw new SystemException(SystemErrorCode.UNAUTHENTICATED);
         }
 
-        JWSVerifier verifier = new MACVerifier(SECRET_KEY.getBytes());
-        SignedJWT signedJWT = SignedJWT.parse(token);
+        try {
+            JWSVerifier verifier = new MACVerifier(SECRET_KEY.getBytes());
+            SignedJWT signedJWT = SignedJWT.parse(token);
 
-        if (!signedJWT.verify(verifier)) {
+            if (!signedJWT.verify(verifier)) {
+                throw new SystemException(SystemErrorCode.UNAUTHENTICATED);
+            }
+
+            if (signedJWT.getJWTClaimsSet().getExpirationTime().before(new Date())) {
+                throw new SystemException(SystemErrorCode.UNAUTHENTICATED);
+            }
+
+            String tokenType = signedJWT.getJWTClaimsSet().getStringClaim("token-type");
+            if (!"refresh".equals(tokenType)) {
+                throw new SystemException(SystemErrorCode.UNAUTHENTICATED);
+            }
+
+            String jwtId = signedJWT.getJWTClaimsSet().getJWTID();
+            if (redisCacheService.hasKey("jwt:blacklist:" + jwtId)) {
+                throw new SystemException(SystemErrorCode.UNAUTHENTICATED);
+            }
+
+            return signedJWT;
+        } catch (ParseException | JOSEException e) {
+            log.error("Lỗi khi parse/verify Refresh Token: {}", e.getMessage());
             throw new SystemException(SystemErrorCode.UNAUTHENTICATED);
         }
-
-        if (signedJWT.getJWTClaimsSet().getExpirationTime().before(new Date())) {
-            throw new SystemException(SystemErrorCode.UNAUTHENTICATED);
-        }
-
-        String tokenType = signedJWT.getJWTClaimsSet().getStringClaim("token-type");
-        if (!"refresh".equals(tokenType)) {
-            throw new SystemException(SystemErrorCode.UNAUTHENTICATED);
-        }
-
-        String jwtId = signedJWT.getJWTClaimsSet().getJWTID();
-        if (redisCacheService.hasKey("jwt:blacklist:" + jwtId)) {
-            throw new SystemException(SystemErrorCode.UNAUTHENTICATED);
-        }
-
-        return signedJWT;
     }
 
     @Override
-    public Map<String, Object> refreshToken(String token) throws ParseException, JOSEException {
-        SignedJWT jwt = verifyRefreshToken(token);
-        invalidatedToken(jwt);
+    public Map<String, Object> refreshToken(String token) {
+        try {
+            SignedJWT jwt = verifyRefreshToken(token);
+            invalidatedToken(jwt);
 
-        String email = jwt.getJWTClaimsSet().getSubject();
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new SystemException(SystemErrorCode.USER_NOT_EXISTED));
+            String email = jwt.getJWTClaimsSet().getSubject();
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new SystemException(SystemErrorCode.USER_NOT_EXISTED));
 
-        // SỬA BỔ SUNG: Tính toán thời gian sống của token cũ để biết user có đang dùng chế độ Remember Me hay không
-        long issueTime = jwt.getJWTClaimsSet().getIssueTime().getTime();
-        long expirationTime = jwt.getJWTClaimsSet().getExpirationTime().getTime();
-        long durationInSeconds = (expirationTime - issueTime) / 1000;
+            // SỬA BỔ SUNG: Tính toán thời gian sống của token cũ để biết user có đang dùng chế độ Remember Me hay không
+            long issueTime = jwt.getJWTClaimsSet().getIssueTime().getTime();
+            long expirationTime = jwt.getJWTClaimsSet().getExpirationTime().getTime();
+            long durationInSeconds = (expirationTime - issueTime) / 1000;
 
-        boolean isRememberMe = durationInSeconds > REFRESH_TOKEN_EXPIRATION;
+            boolean isRememberMe = durationInSeconds > REFRESH_TOKEN_EXPIRATION;
 
-        // Truyền trạng thái isRememberMe vào token mới
-        TokenPair tokenPair = generateTokenPair(user, isRememberMe);
+            // Truyền trạng thái isRememberMe vào token mới
+            TokenPair tokenPair = generateTokenPair(user, isRememberMe);
 
-        Map<String, Object> result = new HashMap<>();
-        result.put("accessToken", tokenPair.getAccessToken());
-        result.put("refreshToken", tokenPair.getRefreshToken());
-        result.put("role", buildScope(user));
+            Map<String, Object> result = new HashMap<>();
+            result.put("accessToken", tokenPair.getAccessToken());
+            result.put("refreshToken", tokenPair.getRefreshToken());
+            result.put("role", buildScope(user));
 
-        return result;
+            return result;
+        } catch (ParseException e) {
+            log.error("Lỗi khi invalidated Token cũ: {}", e.getMessage());
+            throw new SystemException(SystemErrorCode.UNAUTHENTICATED);
+        }
     }
 
     @Override

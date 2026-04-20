@@ -17,6 +17,9 @@ public enum ValidationErrorCode {
     INVALID_EMAIL(104, "Email is invalid", HttpStatus.BAD_REQUEST),
     INVALID_PHONE(105, "Phone number is invalid", HttpStatus.BAD_REQUEST),
     INVALID_OTP(106, "OTP is invalid", HttpStatus.BAD_REQUEST),
+    INVALID_MIN(107, "Min value is not valid", HttpStatus.BAD_REQUEST),
+    INVALID_MAX(108, "Max value is not valid", HttpStatus.BAD_REQUEST),
+
     ;
 
     int code;

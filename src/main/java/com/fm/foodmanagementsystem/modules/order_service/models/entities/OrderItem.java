@@ -5,6 +5,8 @@ import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+import java.util.List;
+
 @Entity
 @Table(name = "order_items")
 @Getter
@@ -31,4 +33,9 @@ public class OrderItem {
 
     @Column(name = "unit_price", nullable = false)
     Double unitPrice;
+
+    @ElementCollection
+    @CollectionTable(name = "order_item_selected_options", joinColumns = @JoinColumn(name = "order_item_id"))
+    @Column(name = "option_name")
+    List<String> selectedOptions;
 }

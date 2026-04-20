@@ -39,8 +39,7 @@ public class AuthController {
     }
 
     @PostMapping("/refresh-token")
-    public ApiResponse<Map<String, Object>> refreshToken(@RequestBody @Valid RefreshTokenRequest request)
-            throws ParseException, JOSEException {
+    public ApiResponse<Map<String, Object>> refreshToken(@RequestBody @Valid RefreshTokenRequest request) {
         return ApiResponse.<Map<String, Object>>builder()
                 .message("Refresh token successfully")
                 .result(authService.refreshToken(request.refreshToken()))
@@ -48,8 +47,7 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ApiResponse<String> logout(@RequestBody @Valid LogoutRequest request)
-            throws ParseException, JOSEException {
+    public ApiResponse<String> logout(@RequestBody @Valid LogoutRequest request) {
 
         authService.logout(request.token());
 
@@ -63,9 +61,18 @@ public class AuthController {
     // 2. ĐĂNG KÝ (LUỒNG PENDING -> OTP -> ACTIVE)
     // =====================================================================
 
-    @PostMapping("/register")
-    public ApiResponse<String> register(@RequestBody @Valid UserCreationRequest request) {
-        authService.registerPendingUser(request);
+    @PostMapping("/register-admin")
+    public ApiResponse<String> registerAdmin(@RequestBody @Valid UserCreationRequest request) {
+        authService.registerPendingUser(request, "ADMIN");
+
+        return ApiResponse.<String>builder()
+                .message("Please check your email for the OTP code")
+                .build();
+    }
+
+    @PostMapping("/register-customer")
+    public ApiResponse<String> registerCustomer(@RequestBody @Valid UserCreationRequest request) {
+        authService.registerPendingUser(request, "USER");
 
         return ApiResponse.<String>builder()
                 .message("Please check your email for the OTP code")

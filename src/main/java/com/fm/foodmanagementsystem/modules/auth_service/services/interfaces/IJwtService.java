@@ -10,7 +10,7 @@ import java.util.Map;
 
 public interface IJwtService {
     JwtService.TokenPair generateTokenPair(User user, boolean rememberMe);
-    SignedJWT verifyRefreshToken(String token) throws JOSEException, ParseException;
-    Map<String, Object> refreshToken(String token) throws ParseException, JOSEException;
+    SignedJWT verifyRefreshToken(String token);
+    Map<String, Object> refreshToken(String token);
     void invalidatedToken(SignedJWT signedJWT) throws ParseException;
 }

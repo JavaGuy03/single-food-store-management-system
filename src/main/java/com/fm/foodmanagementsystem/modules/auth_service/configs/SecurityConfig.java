@@ -1,5 +1,7 @@
 package com.fm.foodmanagementsystem.modules.auth_service.configs;
 
+import com.fm.foodmanagementsystem.modules.auth_service.filters.JwtAuthenticationEntryPoint;
+import com.fm.foodmanagementsystem.modules.auth_service.filters.JwtRedisValidator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,8 +12,12 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
@@ -43,9 +49,11 @@ public class SecurityConfig {
     };
 
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+    private final JwtRedisValidator jwtRedisValidator;
 
-    public SecurityConfig(JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint) {
+    public SecurityConfig(JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint,  JwtRedisValidator jwtRedisValidator) {
         this.jwtAuthenticationEntryPoint = jwtAuthenticationEntryPoint;
+        this.jwtRedisValidator = jwtRedisValidator;
     }
 
     @Bean
@@ -83,9 +91,16 @@ public class SecurityConfig {
     @Bean
     public JwtDecoder jwtDecoder() {
         SecretKeySpec secretKeySpec = new SecretKeySpec(SECRET_KEY.getBytes(), "HmacSHA512");
-        return NimbusJwtDecoder.withSecretKey(secretKeySpec)
+        NimbusJwtDecoder jwtDecoder = NimbusJwtDecoder.withSecretKey(secretKeySpec)
                 .macAlgorithm(MacAlgorithm.from(ALGORITHM))
                 .build();
+
+        OAuth2TokenValidator<Jwt> withTimestamp = new JwtTimestampValidator();
+        OAuth2TokenValidator<Jwt> withRedisCheck = new DelegatingOAuth2TokenValidator<>(withTimestamp, jwtRedisValidator);
+
+        jwtDecoder.setJwtValidator(withRedisCheck);
+
+        return jwtDecoder;
     }
 
     @Bean

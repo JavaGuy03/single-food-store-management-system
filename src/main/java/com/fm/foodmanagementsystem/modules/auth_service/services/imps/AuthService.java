@@ -64,18 +64,26 @@ public class AuthService implements IAuthService {
     }
 
     @Override
-    public Map<String, Object> refreshToken(String refreshToken) throws ParseException, JOSEException {
+    public Map<String, Object> refreshToken(String refreshToken) {
         return jwtService.refreshToken(refreshToken);
     }
 
     @Override
-    public void logout(String token) throws ParseException, JOSEException {
-        SignedJWT signedJWT = SignedJWT.parse(token);
-        jwtService.invalidatedToken(signedJWT);
+    public void logout(String token) {
+        try {
+            SignedJWT signedJWT = SignedJWT.parse(token);
+            jwtService.invalidatedToken(signedJWT);
+        } catch (ParseException e) {
+            log.error("Lỗi khi parse token lúc logout: {}", e.getMessage());
+            throw new SystemException(SystemErrorCode.UNAUTHENTICATED);
+        } catch (Exception e) {
+            log.error("Lỗi hệ thống khi logout: {}", e.getMessage());
+            throw new SystemException(SystemErrorCode.UNAUTHENTICATED);
+        }
     }
 
     @Override
-    public void registerPendingUser(UserCreationRequest request) {
+    public void registerPendingUser(UserCreationRequest request, String roleName) {
         if (userRepository.existsByEmail(request.email())) {
             throw new SystemException(SystemErrorCode.USER_EXISTED);
         }
@@ -87,7 +95,7 @@ public class AuthService implements IAuthService {
                 .password(passwordEncoder.encode(request.password()))
                 .phone(request.phone())
                 .dob(request.dob())
-                .roles(request.roles())
+                .roles(java.util.List.of(roleName))
                 .build();
 
         redisCacheService.set("pending_user:" + request.email(), pendingUser, 15, TimeUnit.MINUTES);
