@@ -16,6 +16,7 @@ public enum SystemErrorCode {
     USER_EXISTED(1003, "User already existed!", HttpStatus.CONFLICT),
     USER_NOT_EXISTED(1004, "User not existed!", HttpStatus.NOT_FOUND),
     DATA_NOT_FOUND(1005, "Data not found!", HttpStatus.NOT_FOUND),
+    INVALID_PARAMETER(1006, "Invalid parameter!", HttpStatus.BAD_REQUEST),
 
     ;
     int code;

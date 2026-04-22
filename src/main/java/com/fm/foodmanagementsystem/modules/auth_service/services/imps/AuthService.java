@@ -2,6 +2,7 @@ package com.fm.foodmanagementsystem.modules.auth_service.services.imps;
 
 import com.fm.foodmanagementsystem.core.exception.SystemException;
 import com.fm.foodmanagementsystem.core.exception.enums.SystemErrorCode;
+import com.fm.foodmanagementsystem.core.services.interfaces.IEmailService;
 import com.fm.foodmanagementsystem.core.services.interfaces.IRedisCacheService;
 import com.fm.foodmanagementsystem.modules.auth_service.mappers.UserMapper;
 import com.fm.foodmanagementsystem.modules.auth_service.models.dtos.PendingUserDto;
@@ -25,10 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.text.ParseException;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -43,6 +41,7 @@ public class AuthService implements IAuthService {
     IJwtService jwtService;
     IRedisCacheService redisCacheService;
     UserMapper userMapper;
+    IEmailService emailService;
 
     @Override
     public TokenResponse login(LoginRequest request) {
@@ -158,12 +157,60 @@ public class AuthService implements IAuthService {
         redisCacheService.delete("otp:FORGOT_PASSWORD:" + request.email());
     }
 
+    @Override
+    public void resendOtp(String email, String type) {
+        // Kiểm tra loại OTP để xác định luồng
+        if ("REGISTER".equals(type)) {
+            // Nếu là gửi lại mã đăng ký, phải kiểm tra xem user này có đang "chờ" trong Redis không
+            PendingUserDto pendingUser = redisCacheService.get("pending_user:" + email, PendingUserDto.class);
+            if (pendingUser == null) {
+                // Nếu không có trong Redis, tức là đã quá 15 phút hoặc chưa từng đăng ký
+                throw new SystemException(SystemErrorCode.USER_NOT_EXISTED);
+            }
+        } else if ("FORGOT_PASSWORD".equals(type)) {
+            // Nếu là gửi lại mã quên mật khẩu, kiểm tra xem user có thật trong DB không
+            if (!userRepository.existsByEmail(email)) {
+                throw new SystemException(SystemErrorCode.USER_NOT_EXISTED);
+            }
+        } else {
+            throw new SystemException(SystemErrorCode.INVALID_PARAMETER); // Nếu FE truyền type tào lao
+        }
+
+        // Gọi lại hàm tiện ích để sinh mã mới đè lên mã cũ trong Redis (hạn 5 phút mới) và gửi mail
+        generateAndSendOtp(email, type);
+    }
+
     private void generateAndSendOtp(String email, String type) {
         String otp = String.format("%06d", new Random().nextInt(999999));
         String redisKey = "otp:" + type + ":" + email;
 
         redisCacheService.set(redisKey, otp, 5, TimeUnit.MINUTES);
-        log.info("MÃ OTP CHO {} (Loại: {}) LÀ: {}", email, type, otp);
+        log.info("MÃ OTP CHO {} (Loại: {}) LÀ: {}", email, type, otp); // Vẫn giữ log để test nhanh trên console
+
+        // 👇 GỌI EMAIL SERVICE ĐỂ GỬI MAIL THẬT 👇
+        try {
+            Map<String, Object> templateModel = new HashMap<>();
+            templateModel.put("otpCode", otp);
+            templateModel.put("email", email);
+
+            String subject;
+            String templateName;
+
+            if ("REGISTER".equals(type)) {
+                subject = "Mã xác nhận đăng ký tài khoản FastBite";
+                templateName = "register-otp"; // Tên file HTML
+            } else {
+                subject = "Mã xác nhận khôi phục mật khẩu FastBite";
+                templateName = "forgot-password-otp"; // Tên file HTML
+            }
+
+            // Gọi hàm gửi mail chạy ngầm
+            emailService.sendHtmlEmail(email, subject, templateName, templateModel);
+
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi email OTP: {}", e.getMessage());
+            // Có thể throw Exception nếu bắt buộc phải gửi được mail mới cho chạy tiếp
+        }
     }
 
     private void verifyOtp(String email, String otpCode, String type) {

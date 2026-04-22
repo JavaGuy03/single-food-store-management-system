@@ -16,6 +16,7 @@ public interface IAuthService {
     void registerPendingUser(RegisterUserRequest request, String roleName);
     UserResponse verifyAndCreateUser(VerifyOtpRequest request);
 
+    void resendOtp(String email, String type);
     void sendForgotPasswordOTP(String email);
     void resetPassword(NewPasswordRequest request);
 }

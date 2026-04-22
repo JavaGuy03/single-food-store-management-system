@@ -98,6 +98,15 @@ public class AuthController {
                 .build();
     }
 
+    @PostMapping("/resend-otp")
+    public ApiResponse<String> resendOtp(@RequestBody @Valid ResendOtpRequest request) {
+        authService.resendOtp(request.email(), request.type());
+
+        return ApiResponse.<String>builder()
+                .message("A new OTP has been sent to your email")
+                .build();
+    }
+
     @PostMapping("/reset-password")
     public ApiResponse<String> resetPassword(@RequestBody @Valid NewPasswordRequest request) {
         authService.resetPassword(request);
