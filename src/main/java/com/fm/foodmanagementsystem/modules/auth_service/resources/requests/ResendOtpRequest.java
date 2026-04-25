@@ -5,12 +5,12 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
 public record ResendOtpRequest(
-        @NotBlank(message = "Email không được để trống")
-        @Email(message = "Định dạng email không hợp lệ")
+        @NotBlank(message = "NOT_BLANK")
+        @Email(message = "INVALID_EMAIL")
         String email,
 
-        @NotBlank(message = "Type không được để trống")
-        @Pattern(regexp = "^(REGISTER|FORGOT_PASSWORD)$", message = "Type chỉ được là REGISTER hoặc FORGOT_PASSWORD")
+        @NotBlank(message = "NOT_BLANK")
+        @Pattern(regexp = "^(REGISTER|FORGOT_PASSWORD)$", message = "INVALID_PARAMETER")
         String type
 ) {
 }

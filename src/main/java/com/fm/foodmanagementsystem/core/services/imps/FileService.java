@@ -32,7 +32,11 @@ public class FileService implements IFileService {
             }
 
             // Đổi tên file để không bị trùng (Ví dụ: 123e4567-e89b..._pizza.jpg)
-            String fileName = UUID.randomUUID().toString() + "_" + file.getOriginalFilename().replaceAll("\\s+", "_");
+            String originalName = file.getOriginalFilename();
+            if (originalName == null || originalName.isBlank()) {
+                originalName = "unnamed";
+            }
+            String fileName = UUID.randomUUID().toString() + "_" + originalName.replaceAll("\\s+", "_");
 
             minioClient.putObject(
                     PutObjectArgs.builder()
@@ -53,13 +57,12 @@ public class FileService implements IFileService {
     // Hàm Lấy Ảnh (Trả về byte array để hiển thị)
     @Override
     public byte[] getFile(String fileName) {
-        try {
-            InputStream stream = minioClient.getObject(
-                    GetObjectArgs.builder()
-                            .bucket(bucketName)
-                            .object(fileName)
-                            .build()
-            );
+        try (InputStream stream = minioClient.getObject(
+                GetObjectArgs.builder()
+                        .bucket(bucketName)
+                        .object(fileName)
+                        .build()
+        )) {
             return stream.readAllBytes();
         } catch (Exception e) {
             throw new RuntimeException("Không tìm thấy file: " + fileName, e);

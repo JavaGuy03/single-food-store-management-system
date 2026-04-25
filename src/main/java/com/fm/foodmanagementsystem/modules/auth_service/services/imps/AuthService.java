@@ -6,6 +6,7 @@ import com.fm.foodmanagementsystem.core.services.interfaces.IEmailService;
 import com.fm.foodmanagementsystem.core.services.interfaces.IRedisCacheService;
 import com.fm.foodmanagementsystem.modules.auth_service.mappers.UserMapper;
 import com.fm.foodmanagementsystem.modules.auth_service.models.dtos.PendingUserDto;
+import com.fm.foodmanagementsystem.modules.auth_service.models.dtos.TokenPair;
 import com.fm.foodmanagementsystem.modules.auth_service.models.entities.Role;
 import com.fm.foodmanagementsystem.modules.auth_service.models.entities.User;
 import com.fm.foodmanagementsystem.modules.auth_service.models.repositories.RoleRepository;
@@ -48,12 +49,17 @@ public class AuthService implements IAuthService {
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new SystemException(SystemErrorCode.USER_NOT_EXISTED));
 
+        // C3: Kiểm tra tài khoản có bị khóa không
+        if (!user.getIsActive()) {
+            throw new SystemException(SystemErrorCode.USER_DISABLED);
+        }
+
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
             throw new SystemException(SystemErrorCode.UNAUTHENTICATED);
         }
 
         // SỬA BỔ SUNG: Truyền cờ rememberMe từ request vào hàm sinh Token
-        JwtService.TokenPair tokenPair = jwtService.generateTokenPair(user, request.rememberMe());
+        TokenPair tokenPair = jwtService.generateTokenPair(user, request.rememberMe());
 
         return TokenResponse.builder()
                 .accessToken(tokenPair.getAccessToken())
@@ -94,6 +100,7 @@ public class AuthService implements IAuthService {
                 .password(passwordEncoder.encode(request.password()))
                 .phone(request.phone())
                 .dob(request.dob())
+                .gender(request.gender())
                 .roles(java.util.List.of(roleName))
                 .build();
 
@@ -119,7 +126,7 @@ public class AuthService implements IAuthService {
                 .lastName(pendingUser.getLastName())
                 .phone(pendingUser.getPhone())
                 .dob(pendingUser.getDob())
-                .gender(1)
+                .gender(pendingUser.getGender())
                 .build();
 
         if (pendingUser.getRoles() != null && !pendingUser.getRoles().isEmpty()) {

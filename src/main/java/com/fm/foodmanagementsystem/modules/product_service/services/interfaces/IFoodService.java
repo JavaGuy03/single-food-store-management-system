@@ -10,4 +10,6 @@ public interface IFoodService {
     List<FoodResponse> getFoodsByCategory(Long categoryId);
     FoodResponse getFoodById(Long id);
     void changeFoodStatus(Long id, boolean isAvailable);
+    FoodResponse updateFood(Long id, FoodRequest request);
+    void deleteFood(Long id);
 }

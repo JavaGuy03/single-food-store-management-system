@@ -11,6 +11,8 @@ import lombok.experimental.FieldDefaults;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/coupons")
 @RequiredArgsConstructor
@@ -28,10 +30,30 @@ public class CouponController {
                 .build();
     }
 
+    // API này dành cho Khách hàng lúc nhập mã ở giỏ hàng (Không cần quyền Admin)
     @GetMapping("/{code}")
     public ApiResponse<CouponResponse> getByCode(@PathVariable String code) {
         return ApiResponse.<CouponResponse>builder()
                 .result(couponService.getCouponByCode(code))
+                .build();
+    }
+
+    // 👇 BỔ SUNG: API Lấy danh sách cho màn hình Admin
+    @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<List<CouponResponse>> getAllCoupons() {
+        return ApiResponse.<List<CouponResponse>>builder()
+                .result(couponService.getAllCoupons())
+                .build();
+    }
+
+    // 👇 BỔ SUNG: API Xoá mã giảm giá
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<Void> deleteCoupon(@PathVariable String id) {
+        couponService.deleteCoupon(id);
+        return ApiResponse.<Void>builder()
+                .message("Xóa mã giảm giá thành công")
                 .build();
     }
 }

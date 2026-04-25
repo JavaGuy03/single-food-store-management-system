@@ -11,6 +11,8 @@ import com.fm.foodmanagementsystem.modules.auth_service.resources.requests.UserC
 import com.fm.foodmanagementsystem.modules.auth_service.resources.requests.UserUpdateRequest;
 import com.fm.foodmanagementsystem.modules.auth_service.resources.responses.UserResponse;
 import com.fm.foodmanagementsystem.modules.auth_service.services.interfaces.IUserService;
+import com.fm.foodmanagementsystem.modules.order_service.models.enums.OrderStatus;
+import com.fm.foodmanagementsystem.modules.order_service.models.repositories.OrderRepository;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -23,6 +25,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 
@@ -34,6 +37,7 @@ public class UserService implements IUserService {
     RoleRepository roleRepository;
     UserMapper userMapper;
     PasswordEncoder passwordEncoder;
+    OrderRepository orderRepository;
 
     @Override
     public UserResponse createUser(UserCreationRequest request) {
@@ -62,15 +66,29 @@ public class UserService implements IUserService {
         if (request.lastName() != null) user.setLastName(request.lastName());
         if (request.phone() != null) user.setPhone(request.phone());
         if (request.dob() != null) user.setDob(request.dob());
-        user.setGender(request.gender());
+        if (request.gender() != null) user.setGender(request.gender());
 
         if (request.password() != null && !request.password().isBlank()) {
             user.setPassword(passwordEncoder.encode(request.password()));
         }
 
-        if (request.roles() != null && !request.roles().isEmpty()) {
-            List<Role> roles = roleRepository.findAllById(request.roles());
+        // Đã THÁO BỎ logic update Role ở đây để tránh lỗ hổng bảo mật
+
+        return userMapper.mapToUserResponse(userRepository.save(user));
+    }
+
+    // Hàm mới: Chỉ dùng để cập nhật Role
+    @Override
+    @CacheEvict(value = "userDetail", key = "#id")
+    public UserResponse updateUserRoles(String id, List<String> roleNames) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new SystemException(SystemErrorCode.USER_NOT_EXISTED));
+
+        if (roleNames != null && !roleNames.isEmpty()) {
+            List<Role> roles = roleRepository.findAllById(roleNames);
             user.setRoles(new HashSet<>(roles));
+        } else {
+            user.getRoles().clear();
         }
 
         return userMapper.mapToUserResponse(userRepository.save(user));
@@ -92,17 +110,36 @@ public class UserService implements IUserService {
     }
 
     @Override
-    public Page<UserResponse> getAllUsers(int page, int size) {
+    public Page<UserResponse> getAllUsers(String search, String role, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        return userRepository.findAll(pageable).map(userMapper::mapToUserResponse);
+        // Gọi hàm searchAndFilterUsers mà anh em mình định nghĩa trong UserRepository ở tin nhắn trước
+        return userRepository.searchAndFilterUsers(search, role, pageable)
+                .map(userMapper::mapToUserResponse);
     }
 
     @Override
     @CacheEvict(value = "userDetail", key = "#id")
     public void deleteUserById(String id) {
-        if (!userRepository.existsById(id)) {
-            throw new SystemException(SystemErrorCode.USER_NOT_EXISTED);
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new SystemException(SystemErrorCode.USER_NOT_EXISTED));
+
+        // Kiểm tra xem User có đơn hàng đang xử lý không
+        List<OrderStatus> activeStatuses = Arrays.asList(
+                OrderStatus.PENDING,
+                OrderStatus.PAID,
+                OrderStatus.PREPARING,
+                OrderStatus.DELIVERING
+        );
+
+        // Giả định bác đã inject OrderRepository vào UserService
+        boolean hasActiveOrders = orderRepository.existsByUserIdAndStatusIn(id, activeStatuses);
+
+        if (hasActiveOrders) {
+            // Ném lỗi báo cho Admin biết không thể khoá
+            throw new SystemException(SystemErrorCode.DATA_IS_IN_USE);
         }
-        userRepository.deleteById(id);
+
+        user.setIsActive(false);
+        userRepository.save(user);
     }
 }

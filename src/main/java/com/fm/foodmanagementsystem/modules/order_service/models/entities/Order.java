@@ -1,5 +1,6 @@
 package com.fm.foodmanagementsystem.modules.order_service.models.entities;
 
+import com.fm.foodmanagementsystem.modules.order_service.models.enums.OrderStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -28,8 +29,9 @@ public class Order {
     @Column(name = "total_amount", nullable = false)
     Double totalAmount;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    String status;
+    OrderStatus status;
 
     @ElementCollection
     @CollectionTable(name = "order_items_summary", joinColumns = @JoinColumn(name = "order_id"))

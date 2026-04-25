@@ -70,4 +70,38 @@ public class OptionService implements IOptionService {
                 .map(optionMapper::mapToGroupResponse)
                 .toList();
     }
+
+    @Override
+    @Transactional
+    public OptionGroupResponse updateOptionGroup(Long groupId, OptionGroupRequest request) {
+        OptionGroup group = optionGroupRepository.findById(groupId)
+                .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
+
+        // Cập nhật thông tin Group
+        group.setName(request.name());
+        group.setMinSelect(request.minSelect());
+        group.setMaxSelect(request.maxSelect());
+
+        // Cập nhật Items (Xoá cũ, Thêm mới)
+        // Lưu ý: Nhờ có cascade = CascadeType.ALL và orphanRemoval = true (bác nên thêm orphanRemoval vào Entity),
+        // hibernate sẽ tự động xoá các item cũ bị loại khỏi list.
+        if (group.getItems() != null) {
+            group.getItems().clear();
+        }
+
+        if (request.items() != null && !request.items().isEmpty()) {
+            List<OptionItem> newItems = request.items().stream().map(itemReq -> {
+                OptionItem item = new OptionItem();
+                item.setName(itemReq.name());
+                item.setPriceAdjustment(itemReq.priceAdjustment());
+                item.setOptionGroup(group);
+                return item;
+            }).toList();
+
+            group.getItems().addAll(newItems);
+        }
+
+        OptionGroup savedGroup = optionGroupRepository.save(group);
+        return optionMapper.mapToGroupResponse(savedGroup);
+    }
 }

@@ -21,15 +21,17 @@ public class OptionGroup {
     String name; // Ví dụ: "Toppings", "Size"
 
     @Column(name = "min_select")
+    @Builder.Default
     Integer minSelect = 0; // Ít nhất phải chọn bao nhiêu (0 là không bắt buộc)
 
     @Column(name = "max_select")
+    @Builder.Default
     Integer maxSelect = 1; // Được chọn tối đa bao nhiêu
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "food_id")
     Food food;
 
-    @OneToMany(mappedBy = "optionGroup", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "optionGroup", cascade = CascadeType.ALL, orphanRemoval = true)
     List<OptionItem> items;
 }

@@ -8,15 +8,22 @@ import com.fm.foodmanagementsystem.modules.payment_service.models.entities.Payme
 import com.fm.foodmanagementsystem.modules.payment_service.models.repositories.PaymentTransactionRepository;
 import com.fm.foodmanagementsystem.modules.payment_service.services.interfaces.IPaymentService;
 import com.fm.foodmanagementsystem.modules.payment_service.utils.HmacUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
@@ -32,8 +39,11 @@ public class PaymentService implements IPaymentService {
 
     ZaloPayConfig zaloPayConfig;
     IOrderService orderService;
-    RestTemplate restTemplate = new RestTemplate();
     PaymentTransactionRepository paymentTransactionRepository;
+
+    // C4: Đánh dấu @NonFinal để Lombok không yêu cầu inject qua constructor
+    @NonFinal
+    RestTemplate restTemplate = new RestTemplate();
 
     @Override
     public Map<String, Object> createZaloPayOrder(String orderId, double amount) {
@@ -48,7 +58,7 @@ public class PaymentService implements IPaymentService {
         order.put("description", "Thanh toan don hang #" + orderId);
         order.put("bank_code", "");
         order.put("item", "[]");
-        order.put("embed_data", "{\"orderId\": \"" + orderId + "\"}"); // Gói kèm orderId để lát Query còn biết đường mà cập nhật
+        order.put("embed_data", "{\"orderId\": \"" + orderId + "\"}"); // Gắn kèm orderId để lúc Query còn biết đồng mà cập nhật
         order.put("callback_url", zaloPayConfig.getCallbackUrl());
 
         String data = order.get("app_id") + "|" + order.get("app_trans_id") + "|" + order.get("app_user") + "|" + order.get("amount")
@@ -56,7 +66,7 @@ public class PaymentService implements IPaymentService {
 
         order.put("mac", HmacUtil.HMacHexStringEncode(HmacUtil.HMACSHA256, zaloPayConfig.getKey1(), data));
 
-        // Gọi API ZaloPay
+        // Gửi API ZaloPay
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
         MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
@@ -83,11 +93,14 @@ public class PaymentService implements IPaymentService {
             return response;
         } catch (Exception e) {
             log.error("Lỗi gọi API ZaloPay: ", e);
-            throw new SystemException(SystemErrorCode.UNCATEGORIZED_EXCEPTION); // Bác có thể tự tạo mã lỗi ZALOPAY_ERROR
+            throw new SystemException(SystemErrorCode.UNCATEGORIZED_EXCEPTION);
         }
     }
 
+    // M9: Hoàn thiện logic cập nhật trạng thái đơn hàng khi thanh toán thành công
     @Override
+    @Transactional
+    @SuppressWarnings("unchecked")
     public Map<String, Object> queryZaloPayOrder(String appTransId) {
         String data = zaloPayConfig.getAppId() + "|" + appTransId + "|" + zaloPayConfig.getKey1();
         String mac = HmacUtil.HMacHexStringEncode(HmacUtil.HMACSHA256, zaloPayConfig.getKey1(), data);
@@ -110,20 +123,64 @@ public class PaymentService implements IPaymentService {
 
                 if (returnCode == 1) {
                     // Thanh toán THÀNH CÔNG!
-                    // Bước cực kỳ tinh tế: Rút cái orderId bị giấu trong trường embed_data ra
-                    // (Lưu ý: ZaloPay trả về embed_data dưới dạng chuỗi JSON, nên cần bóc tách)
                     log.info("Giao dịch {} THÀNH CÔNG! Đang cập nhật trạng thái đơn hàng...", appTransId);
 
-                    // TODO: Gọi orderService.updateOrderStatus(orderId, "PAID");
-                    // (Bác chờ ở tin nhắn sau em chỉ cách bóc cái orderId ra nhé)
+                    // Rút orderId từ embed_data
+                    String orderId = extractOrderIdFromTransaction(appTransId);
 
-                    response.put("order_status_update", "SUCCESS");
+                    if (orderId != null) {
+                        orderService.updateOrderStatus(orderId, "PAID");
+                        updateTransactionStatus(appTransId, "SUCCESS");
+                        response.put("order_status_update", "SUCCESS");
+                        log.info("Đã cập nhật đơn hàng {} sang trạng thái PAID", orderId);
+                    } else {
+                        log.warn("Không tìm thấy orderId cho giao dịch {}", appTransId);
+                        response.put("order_status_update", "ORDER_NOT_FOUND");
+                    }
+                } else if (returnCode == 2) {
+                    // Thanh toán THẤT BẠI
+                    updateTransactionStatus(appTransId, "FAILED");
                 }
             }
             return response;
         } catch (Exception e) {
             log.error("Lỗi truy vấn ZaloPay: ", e);
             throw new SystemException(SystemErrorCode.UNCATEGORIZED_EXCEPTION);
+        }
+    }
+
+    // Helper: Tìm orderId từ PaymentTransaction đã lưu
+    private String extractOrderIdFromTransaction(String appTransId) {
+        return paymentTransactionRepository.findByAppTransId(appTransId)
+                .map(PaymentTransaction::getOrderId)
+                .orElse(null);
+    }
+
+    private void updateTransactionStatus(String appTransId, String status) {
+        paymentTransactionRepository.findByAppTransId(appTransId).ifPresent(tx -> {
+            tx.setStatus(status);
+            paymentTransactionRepository.save(tx);
+        });
+    }
+
+    // CRON JOB: Tự động check các giao dịch PENDING mỗi 2 phút
+    @Scheduled(fixedDelay = 120000)
+    @Transactional
+    public void pollPendingTransactions() {
+        List<PaymentTransaction> pendingTx = paymentTransactionRepository.findByStatus("PENDING");
+        if (!pendingTx.isEmpty()) {
+            log.info("CronJob: Đang kiểm tra {} giao dịch ZaloPay PENDING...", pendingTx.size());
+            for (PaymentTransaction tx : pendingTx) {
+                // Tránh query các giao dịch mới tạo trong vòng 1 phút qua
+                if (tx.getCreatedAt().plusMinutes(1).isBefore(java.time.LocalDateTime.now())) {
+                    queryZaloPayOrder(tx.getAppTransId());
+                }
+                
+                // Hủy giao dịch nếu treo quá 15 phút
+                if (tx.getCreatedAt().plusMinutes(15).isBefore(java.time.LocalDateTime.now())) {
+                    updateTransactionStatus(tx.getAppTransId(), "FAILED");
+                }
+            }
         }
     }
 

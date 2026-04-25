@@ -19,5 +19,6 @@ public class PendingUserDto {
     String lastName;
     String phone;
     LocalDate dob;
+    int gender;
     List<String> roles;
 }

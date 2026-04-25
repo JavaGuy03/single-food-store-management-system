@@ -11,11 +11,11 @@ public record OptionGroupRequest(
         String name,
 
         @NotNull(message = "NOT_NULL")
-        @Min(value = 0, message = "MIN_INVALID")
+        @Min(value = 0, message = "INVALID_MIN")
         Integer minSelect,
 
         @NotNull(message = "NOT_NULL")
-        @Min(value = 1, message = "MIN_INVALID")
+        @Min(value = 1, message = "INVALID_MIN")
         Integer maxSelect,
 
         @NotNull(message = "NOT_NULL")

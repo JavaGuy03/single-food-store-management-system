@@ -38,6 +38,10 @@ public class User {
     @Column(nullable = false)
     LocalDate dob;
 
+    @Column(name = "is_active", nullable = false)
+    @Builder.Default
+    Boolean isActive = true;
+
     @Column(nullable = false)
     int gender;
 

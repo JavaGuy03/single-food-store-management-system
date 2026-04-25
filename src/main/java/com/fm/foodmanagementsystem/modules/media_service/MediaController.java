@@ -22,9 +22,27 @@ public class MediaController {
 
     // API Phục vụ ảnh (Mobile sẽ dùng thẻ <Image src="https://ngrok-domain/api/v1/media/hinh-pizza.jpg" />)
     // Lưu ý: api này phải được cấu hình permitAll() trong SecurityConfig nhé
-    @GetMapping(value = "/{fileName}", produces = MediaType.IMAGE_JPEG_VALUE)
+    @GetMapping("/{fileName}")
     public ResponseEntity<byte[]> getImage(@PathVariable String fileName) {
         byte[] imageBytes = fileService.getFile(fileName);
-        return ResponseEntity.ok().body(imageBytes);
+
+        // Detect content type từ file extension
+        MediaType contentType = MediaType.APPLICATION_OCTET_STREAM; // default
+        String lowerName = fileName.toLowerCase();
+        if (lowerName.endsWith(".png")) {
+            contentType = MediaType.IMAGE_PNG;
+        } else if (lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg")) {
+            contentType = MediaType.IMAGE_JPEG;
+        } else if (lowerName.endsWith(".gif")) {
+            contentType = MediaType.IMAGE_GIF;
+        } else if (lowerName.endsWith(".webp")) {
+            contentType = MediaType.parseMediaType("image/webp");
+        } else if (lowerName.endsWith(".svg")) {
+            contentType = MediaType.parseMediaType("image/svg+xml");
+        }
+
+        return ResponseEntity.ok()
+                .contentType(contentType)
+                .body(imageBytes);
     }
 }

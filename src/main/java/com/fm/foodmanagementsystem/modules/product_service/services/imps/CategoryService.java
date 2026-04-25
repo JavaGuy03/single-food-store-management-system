@@ -6,6 +6,7 @@ import com.fm.foodmanagementsystem.core.services.interfaces.IFileService;
 import com.fm.foodmanagementsystem.modules.product_service.mappers.CategoryMapper;
 import com.fm.foodmanagementsystem.modules.product_service.models.entities.Category;
 import com.fm.foodmanagementsystem.modules.product_service.models.repositories.CategoryRepository;
+import com.fm.foodmanagementsystem.modules.product_service.models.repositories.FoodRepository;
 import com.fm.foodmanagementsystem.modules.product_service.resources.requests.CategoryRequest;
 import com.fm.foodmanagementsystem.modules.product_service.resources.responses.CategoryResponse;
 import com.fm.foodmanagementsystem.modules.product_service.services.interfaces.ICategoryService;
@@ -25,12 +26,13 @@ public class CategoryService implements ICategoryService {
     CategoryRepository categoryRepository;
     CategoryMapper categoryMapper;
     IFileService fileService;
+    FoodRepository foodRepository;
 
     @Override
     @Transactional
     public CategoryResponse createCategory(CategoryRequest request) {
         if (categoryRepository.existsByName(request.name())) {
-            throw new SystemException(SystemErrorCode.DATA_NOT_FOUND);
+            throw new SystemException(SystemErrorCode.DATA_IS_IN_USE);
         }
 
         String imageName = null;
@@ -65,10 +67,35 @@ public class CategoryService implements ICategoryService {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
 
+        boolean hasFoods = foodRepository.existsByCategoryId(id);
+        if (hasFoods) {
+            throw new SystemException(SystemErrorCode.DATA_IS_IN_USE);
+        }
+
         if (category.getImageName() != null) {
             fileService.deleteFile(category.getImageName());
         }
 
         categoryRepository.deleteById(id);
+    }
+
+    @Override
+    @Transactional
+    public CategoryResponse updateCategory(Long id, CategoryRequest request) {
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
+
+        category.setName(request.name());
+        category.setDescription(request.description());
+
+        if (request.file() != null && !request.file().isEmpty()) {
+            if (category.getImageName() != null) {
+                fileService.deleteFile(category.getImageName());
+            }
+            String newImageName = fileService.uploadFile(request.file());
+            category.setImageName(newImageName);
+        }
+
+        return categoryMapper.mapToResponse(categoryRepository.save(category));
     }
 }

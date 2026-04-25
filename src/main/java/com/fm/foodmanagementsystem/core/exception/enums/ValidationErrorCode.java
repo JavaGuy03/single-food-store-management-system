@@ -19,6 +19,8 @@ public enum ValidationErrorCode {
     INVALID_OTP(106, "OTP is invalid", HttpStatus.BAD_REQUEST),
     INVALID_MIN(107, "Min value is not valid", HttpStatus.BAD_REQUEST),
     INVALID_MAX(108, "Max value is not valid", HttpStatus.BAD_REQUEST),
+    INVALID_PASSWORD(109, "Password must be 8-16 characters with uppercase, lowercase, number, and special character", HttpStatus.BAD_REQUEST),
+    MIN_INVALID(110, "Min value is not valid", HttpStatus.BAD_REQUEST),
 
     ;
 

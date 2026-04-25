@@ -10,7 +10,10 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.data.domain.Page;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -20,8 +23,10 @@ public class UserController {
     IUserService userService;
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<UserResponse> createUser(@RequestBody @Valid UserCreationRequest request) {
         return ApiResponse.<UserResponse>builder()
+                .message("Tạo người dùng thành công")
                 .result(userService.createUser(request))
                 .build();
     }
@@ -31,11 +36,25 @@ public class UserController {
             @PathVariable String id,
             @RequestBody @Valid UserUpdateRequest request) {
         return ApiResponse.<UserResponse>builder()
+                .message("Cập nhật thông tin thành công")
                 .result(userService.updateUserById(id, request))
                 .build();
     }
 
+    // Cấp riêng API này cho Admin sửa quyền
+    @PutMapping("/{id}/roles")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<UserResponse> updateUserRoles(
+            @PathVariable String id,
+            @RequestBody List<String> roleNames) {
+        return ApiResponse.<UserResponse>builder()
+                .message("Cập nhật phân quyền thành công")
+                .result(userService.updateUserRoles(id, roleNames))
+                .build();
+    }
+
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<UserResponse> getUserById(@PathVariable String id) {
         return ApiResponse.<UserResponse>builder()
                 .result(userService.getUserById(id))
@@ -50,19 +69,23 @@ public class UserController {
     }
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<Page<UserResponse>> getAllUsers(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String role,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return ApiResponse.<Page<UserResponse>>builder()
-                .result(userService.getAllUsers(page, size))
+                .result(userService.getAllUsers(search, role, page, size))
                 .build();
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<String> deleteUser(@PathVariable String id) {
         userService.deleteUserById(id);
         return ApiResponse.<String>builder()
-                .message("Delete user successfully")
+                .message("Đã khoá tài khoản người dùng thành công")
                 .build();
     }
 }

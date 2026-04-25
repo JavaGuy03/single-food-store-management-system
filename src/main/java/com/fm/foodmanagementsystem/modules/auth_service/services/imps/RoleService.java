@@ -25,7 +25,9 @@ public class RoleService implements IRoleService {
     RoleMapper roleMapper;
 
     public RoleResponse create(RoleRequest request) {
-        List<Permission> permissions = permissionRepository.findAllById(request.permissions());
+        List<Permission> permissions = (request.permissions() != null)
+                ? permissionRepository.findAllById(request.permissions())
+                : List.of();
 
         Role role = new Role();
         role.setName(request.name());

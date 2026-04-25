@@ -3,6 +3,7 @@ package com.fm.foodmanagementsystem.modules.auth_service.services.imps;
 import com.fm.foodmanagementsystem.core.exception.SystemException;
 import com.fm.foodmanagementsystem.core.exception.enums.SystemErrorCode;
 import com.fm.foodmanagementsystem.core.services.interfaces.IRedisCacheService;
+import com.fm.foodmanagementsystem.modules.auth_service.models.dtos.TokenPair;
 import com.fm.foodmanagementsystem.modules.auth_service.models.entities.Role;
 import com.fm.foodmanagementsystem.modules.auth_service.models.entities.User;
 import com.fm.foodmanagementsystem.modules.auth_service.models.repositories.UserRepository;
@@ -179,14 +180,4 @@ public class JwtService implements IJwtService {
         }
     }
 
-    @Getter
-    @Setter
-    @AllArgsConstructor
-    @NoArgsConstructor
-    @Builder
-    @FieldDefaults(level = AccessLevel.PRIVATE)
-    public static class TokenPair {
-        String accessToken;
-        String refreshToken;
-    }
 }

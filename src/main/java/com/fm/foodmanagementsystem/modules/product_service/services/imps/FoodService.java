@@ -57,17 +57,17 @@ public class FoodService implements IFoodService {
 
     @Override
     public List<FoodResponse> getAllFoods() {
-        return foodRepository.findAll().stream()
-                .map(food -> {
-                    List<OptionGroup> options = optionGroupRepository.findAllByFoodId(food.getId());
-                    return foodMapper.mapToResponse(food, options);
-                }).toList();
+        // M7: Chỉ trả về món ăn đang bán cho khách hàng
+        // M8: Tối ưu hóa N+1 bằng EntityGraph, không cần query OptionGroupRepository trong vòng lặp nữa
+        return foodRepository.findAllByIsAvailableTrue().stream()
+                .map(food -> foodMapper.mapToResponse(food, food.getOptionGroups()))
+                .toList();
     }
 
     @Override
     public List<FoodResponse> getFoodsByCategory(Long categoryId) {
         return foodRepository.findAllByCategoryId(categoryId).stream()
-                .map(food -> foodMapper.mapToResponse(food, optionGroupRepository.findAllByFoodId(food.getId())))
+                .map(food -> foodMapper.mapToResponse(food, food.getOptionGroups()))
                 .toList();
     }
 
@@ -75,8 +75,7 @@ public class FoodService implements IFoodService {
     public FoodResponse getFoodById(Long id) {
         Food food = foodRepository.findById(id)
                 .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
-        List<OptionGroup> options = optionGroupRepository.findAllByFoodId(food.getId());
-        return foodMapper.mapToResponse(food, options);
+        return foodMapper.mapToResponse(food, food.getOptionGroups());
     }
 
     @Override
@@ -84,6 +83,43 @@ public class FoodService implements IFoodService {
     public void changeFoodStatus(Long id, boolean isAvailable) {
         Food food = foodRepository.findById(id).orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
         food.setIsAvailable(isAvailable);
+        foodRepository.save(food);
+    }
+
+    @Override
+    @Transactional
+    public FoodResponse updateFood(Long id, FoodRequest request) {
+        Food food = foodRepository.findById(id)
+                .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
+
+        Category category = categoryRepository.findById(request.categoryId())
+                .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
+
+        food.setName(request.name());
+        food.setDescription(request.description());
+        food.setPrice(request.price());
+        food.setCategory(category);
+
+        if (request.file() != null && !request.file().isEmpty()) {
+            if (food.getImageName() != null) {
+                fileService.deleteFile(food.getImageName());
+            }
+            String newImageName = fileService.uploadFile(request.file());
+            food.setImageName(newImageName);
+        }
+
+        Food updatedFood = foodRepository.save(food);
+        return foodMapper.mapToResponse(updatedFood, updatedFood.getOptionGroups());
+    }
+
+    @Override
+    @Transactional
+    public void deleteFood(Long id) {
+        Food food = foodRepository.findById(id)
+                .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
+
+        // M6: Soft delete - không xóa ảnh vì món ăn vẫn hiển thị trong lịch sử đơn hàng
+        food.setIsAvailable(false);
         foodRepository.save(food);
     }
 }

@@ -8,10 +8,13 @@ import com.fm.foodmanagementsystem.modules.order_service.models.repositories.Cou
 import com.fm.foodmanagementsystem.modules.order_service.resources.requests.CouponRequest;
 import com.fm.foodmanagementsystem.modules.order_service.resources.responses.CouponResponse;
 import com.fm.foodmanagementsystem.modules.order_service.services.interfaces.ICouponService;
+import jakarta.transaction.Transactional;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -23,7 +26,7 @@ public class CouponService implements ICouponService {
 
     @Override
     public CouponResponse createCoupon(CouponRequest request) {
-        if (couponRepository.existsByCode(request.code())) throw new SystemException(SystemErrorCode.DATA_NOT_FOUND);
+        if (couponRepository.existsByCode(request.code())) throw new SystemException(SystemErrorCode.COUPON_ALREADY_EXISTS);
 
         Coupon coupon = Coupon.builder()
                 .code(request.code().toUpperCase())
@@ -43,5 +46,21 @@ public class CouponService implements ICouponService {
         Coupon coupon = couponRepository.findByCode(code.toUpperCase())
                 .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
         return couponMapper.mapToResponse(coupon);
+    }
+
+    @Override
+    public List<CouponResponse> getAllCoupons() {
+        return couponRepository.findAll().stream()
+                .map(couponMapper::mapToResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public void deleteCoupon(String id) {
+        if (!couponRepository.existsById(id)) {
+            throw new SystemException(SystemErrorCode.DATA_NOT_FOUND);
+        }
+        couponRepository.deleteById(id);
     }
 }

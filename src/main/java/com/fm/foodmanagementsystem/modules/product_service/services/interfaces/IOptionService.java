@@ -8,4 +8,5 @@ public interface IOptionService {
     OptionGroupResponse createOptionGroup(Long foodId, OptionGroupRequest request);
     void deleteOptionGroup(Long groupId);
     List<OptionGroupResponse> getOptionsByFoodId(Long foodId);
+    OptionGroupResponse updateOptionGroup(Long groupId, OptionGroupRequest request);
 }

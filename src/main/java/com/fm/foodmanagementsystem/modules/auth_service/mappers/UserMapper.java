@@ -12,12 +12,14 @@ import java.util.Collections;
 public class UserMapper {
     public UserResponse mapToUserResponse(User user){
         return UserResponse.builder()
+                .id(user.getId())
                 .email(user.getEmail())
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .phone(user.getPhone())
                 .dob(user.getDob())
                 .gender(user.getGender())
+                .isActive(user.getIsActive())
                 .roles(user.getRoles() != null ? user.getRoles().stream().map(Role::getName).toList() : Collections.emptyList())
                 .build();
     }

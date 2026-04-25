@@ -45,6 +45,17 @@ public class CategoryController {
                 .build();
     }
 
+    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<CategoryResponse> update(
+            @PathVariable Long id,
+            @ModelAttribute @Valid CategoryRequest request) {
+        return ApiResponse.<CategoryResponse>builder()
+                .message("Cập nhật danh mục thành công")
+                .result(categoryService.updateCategory(id, request))
+                .build();
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<Void> delete(@PathVariable Long id) {

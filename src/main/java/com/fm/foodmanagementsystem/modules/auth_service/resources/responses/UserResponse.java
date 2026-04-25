@@ -7,6 +7,8 @@ import java.util.List;
 
 @Builder
 public record UserResponse(
+        String id,
+
         String email,
 
         String firstName,
@@ -18,6 +20,8 @@ public record UserResponse(
         LocalDate dob,
 
         int gender,
+
+        Boolean isActive,
 
         List<String> roles
 ) {

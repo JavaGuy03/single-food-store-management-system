@@ -34,7 +34,6 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(value = MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Object>> handlingValidationException(MethodArgumentNotValidException methodArgumentNotValidException){
         Map<String, String> errors = new HashMap<>();
-        int code = HttpStatus.BAD_REQUEST.value();
 
         for(FieldError error : methodArgumentNotValidException.getBindingResult().getFieldErrors()) {
             String field = error instanceof FieldError ? error.getField() : "unknown error";
@@ -53,12 +52,11 @@ public class GlobalExceptionHandler {
             }
 
             errors.put(field, message);
-            code = validationCode.getCode();
         }
 
         return ResponseEntity
                 .badRequest()
-                .body(new ApiResponse<>(code, "Validation failed", errors));
+                .body(new ApiResponse<>(HttpStatus.BAD_REQUEST.value(), "Validation failed", errors));
     }
 
     // 3. Handle Uncategorized Exception (Lỗi 500, NullPointer, DB Error...)

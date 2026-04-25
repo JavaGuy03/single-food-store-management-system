@@ -52,10 +52,30 @@ public class FoodController {
                 .build();
     }
 
+    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<FoodResponse> update(
+            @PathVariable Long id,
+            @ModelAttribute @Valid FoodRequest request) {
+        return ApiResponse.<FoodResponse>builder()
+                .message("Cập nhật món ăn thành công")
+                .result(foodService.updateFood(id, request))
+                .build();
+    }
+
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<Void> changeStatus(@PathVariable Long id, @RequestParam boolean isAvailable) {
         foodService.changeFoodStatus(id, isAvailable);
         return ApiResponse.<Void>builder().message("Cập nhật trạng thái món ăn thành công").build();
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<Void> delete(@PathVariable Long id) {
+        foodService.deleteFood(id);
+        return ApiResponse.<Void>builder()
+                .message("Đã ngừng bán món ăn thành công") // Thông báo mềm mại vì ta dùng Soft Delete
+                .build();
     }
 }

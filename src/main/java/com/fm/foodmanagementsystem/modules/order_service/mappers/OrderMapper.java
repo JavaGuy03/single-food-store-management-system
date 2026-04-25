@@ -34,7 +34,7 @@ public class OrderMapper {
                 .userId(order.getUserId())
                 .orderDate(order.getOrderDate())
                 .totalAmount(order.getTotalAmount())
-                .status(order.getStatus())
+                .status(order.getStatus() != null ? order.getStatus().name() : null)
                 .deliveryAddress(order.getDeliveryAddress())
                 .note(order.getNote())
                 .itemsSummary(order.getItemsSummary())

@@ -9,7 +9,7 @@ public record OptionItemRequest(
         String name,
 
         @NotNull(message = "NOT_NULL")
-        @Min(value = 0, message = "MIN_INVALID")
+        @Min(value = 0, message = "INVALID_MIN")
         Double priceAdjustment
 ) {
 }
