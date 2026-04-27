@@ -114,6 +114,9 @@ public class OrderService implements IOrderService {
             }
 
             for (OptionItem opt : selectedOptions) {
+                if (!opt.getOptionGroup().getFood().getId().equals(food.getId())) {
+                    throw new SystemException(SystemErrorCode.INVALID_PARAMETER);
+                }
                 unitPrice += opt.getPriceAdjustment();
                 optionNames.add(opt.getName());
             }
@@ -232,7 +235,7 @@ public class OrderService implements IOrderService {
             case "PREPARING" -> "Nhà hàng đang chuẩn bị món ăn cho bạn. Vui lòng đợi nhé!";
             case "DELIVERING" -> "Đơn hàng đang trên đường giao đến bạn. Tài xế sẽ sớm liên hệ!";
             case "COMPLETED" -> "Đơn hàng đã giao thành công. Chúc bạn ngon miệng!";
-            case "CANCELED" -> "Đơn hàng của bạn đã bị hủy.";
+            case "CANCELLED" -> "Đơn hàng của bạn đã bị hủy.";
             default -> "Trạng thái đơn hàng của bạn đã được cập nhật thành: " + status;
         };
     }

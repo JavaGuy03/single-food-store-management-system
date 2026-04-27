@@ -17,7 +17,9 @@ import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -41,13 +43,13 @@ public class OptionService implements IOptionService {
         group.setFood(food);
 
         if (request.items() != null && !request.items().isEmpty()) {
-            List<OptionItem> items = request.items().stream().map(itemReq -> {
+            Set<OptionItem> items = new HashSet<>(request.items().stream().map(itemReq -> {
                 OptionItem item = new OptionItem();
                 item.setName(itemReq.name());
                 item.setPriceAdjustment(itemReq.priceAdjustment());
                 item.setOptionGroup(group);
                 return item;
-            }).toList();
+            }).toList());
             group.setItems(items);
         }
 
@@ -90,13 +92,13 @@ public class OptionService implements IOptionService {
         }
 
         if (request.items() != null && !request.items().isEmpty()) {
-            List<OptionItem> newItems = request.items().stream().map(itemReq -> {
+            Set<OptionItem> newItems = new HashSet<>(request.items().stream().map(itemReq -> {
                 OptionItem item = new OptionItem();
                 item.setName(itemReq.name());
                 item.setPriceAdjustment(itemReq.priceAdjustment());
                 item.setOptionGroup(group);
                 return item;
-            }).toList();
+            }).toList());
 
             group.getItems().addAll(newItems);
         }

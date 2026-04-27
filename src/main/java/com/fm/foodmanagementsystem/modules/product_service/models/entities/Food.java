@@ -3,7 +3,7 @@ package com.fm.foodmanagementsystem.modules.product_service.models.entities;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "foods")
@@ -38,5 +38,5 @@ public class Food {
     Category category;
 
     @OneToMany(mappedBy = "food", cascade = CascadeType.ALL, orphanRemoval = true)
-    List<OptionGroup> optionGroups;
+    Set<OptionGroup> optionGroups;
 }

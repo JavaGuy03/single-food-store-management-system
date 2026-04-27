@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
@@ -20,7 +21,7 @@ public class FoodMapper {
 
     private final OptionMapper optionMapper; // Inject OptionMapper vào đây
 
-    public FoodResponse mapToResponse(Food food, List<OptionGroup> optionGroups) {
+    public FoodResponse mapToResponse(Food food, Collection<OptionGroup> optionGroups) {
         String imageUrl = (food.getImageName() != null)
                 ? serverUrl + "/api/v1/media/" + food.getImageName()
                 : null;
@@ -28,6 +29,7 @@ public class FoodMapper {
         List<OptionGroupResponse> groupResponses = optionGroups != null
                 ? optionGroups.stream().map(optionMapper::mapToGroupResponse).toList()
                 : Collections.emptyList();
+
 
         return FoodResponse.builder()
                 .id(food.getId())

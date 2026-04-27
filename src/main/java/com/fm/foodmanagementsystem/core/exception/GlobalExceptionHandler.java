@@ -11,6 +11,10 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -59,7 +63,28 @@ public class GlobalExceptionHandler {
                 .body(new ApiResponse<>(HttpStatus.BAD_REQUEST.value(), "Validation failed", errors));
     }
 
-    // 3. Handle Uncategorized Exception (Lỗi 500, NullPointer, DB Error...)
+    // 3. Handle Spring Security 403 Forbidden
+    @ExceptionHandler(value = AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Object>> handlingAccessDeniedException(AccessDeniedException exception) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ApiResponse<>(HttpStatus.FORBIDDEN.value(), "Access Denied: You do not have permission to access this resource", null));
+    }
+
+    // 4. Handle 404 Not Found
+    @ExceptionHandler(value = NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Object>> handlingNotFoundException(NoResourceFoundException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ApiResponse<>(HttpStatus.NOT_FOUND.value(), "Resource not found: " + exception.getResourcePath(), null));
+    }
+
+    // 5. Handle Bad Request (Type mismatch, unreadable JSON, etc)
+    @ExceptionHandler(value = {HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class, IllegalArgumentException.class})
+    public ResponseEntity<ApiResponse<Object>> handlingBadRequestException(Exception exception) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ApiResponse<>(HttpStatus.BAD_REQUEST.value(), "Invalid request format or parameters", null));
+    }
+
+    // 6. Handle Uncategorized Exception (Lỗi 500, NullPointer, DB Error...)
     @ExceptionHandler(value = Exception.class)
     public ResponseEntity<ApiResponse<Object>> handlingUnknownException(Exception exception) {
         log.error("Uncategorized error: ", exception); // Nên log lỗi ra để debug

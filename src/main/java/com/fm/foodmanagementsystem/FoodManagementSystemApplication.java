@@ -11,7 +11,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableAsync
 @EnableScheduling
 public class FoodManagementSystemApplication {
-
     public static void main(String[] args) {
         SpringApplication.run(FoodManagementSystemApplication.class, args);
     }

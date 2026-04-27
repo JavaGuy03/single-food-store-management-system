@@ -65,14 +65,6 @@ public class AppNotificationService implements IAppNotificationService {
     @Override
     @Transactional
     public void markAllAsRead(String userId) {
-        Pageable pageable = PageRequest.of(0, Integer.MAX_VALUE);
-        Page<AppNotification> notifications = notificationRepository.findAllByUserIdOrderByCreatedAtDesc(userId, pageable);
-        
-        for (AppNotification notification : notifications.getContent()) {
-            if (!notification.getIsRead()) {
-                notification.setIsRead(true);
-                notificationRepository.save(notification);
-            }
-        }
+        notificationRepository.markAllAsReadByUserId(userId);
     }
 }
