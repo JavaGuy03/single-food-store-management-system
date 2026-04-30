@@ -8,6 +8,7 @@ import java.util.List;
 public interface ICouponService {
     CouponResponse createCoupon(CouponRequest request);
     CouponResponse getCouponByCode(String code);
+    CouponResponse updateCoupon(String id, CouponRequest request);
     List<CouponResponse> getAllCoupons();
     void deleteCoupon(String id);
 }

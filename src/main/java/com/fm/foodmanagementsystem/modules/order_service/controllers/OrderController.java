@@ -50,6 +50,15 @@ public class OrderController {
                 .build();
     }
 
+    @PostMapping("/{id}/cancel")
+    public ApiResponse<Void> cancelOrder(@PathVariable String id) {
+        String userId = getUserIdFromToken();
+        orderService.cancelOrder(userId, id);
+        return ApiResponse.<Void>builder()
+                .message("Huỷ đơn hàng thành công")
+                .build();
+    }
+
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<Void> updateStatus(@PathVariable String id, @RequestParam String status) {

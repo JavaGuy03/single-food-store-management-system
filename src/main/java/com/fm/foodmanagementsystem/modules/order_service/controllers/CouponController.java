@@ -40,7 +40,6 @@ public class CouponController {
 
     // 👇 BỔ SUNG: API Lấy danh sách cho màn hình Admin
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<List<CouponResponse>> getAllCoupons() {
         return ApiResponse.<List<CouponResponse>>builder()
                 .result(couponService.getAllCoupons())
@@ -54,6 +53,16 @@ public class CouponController {
         couponService.deleteCoupon(id);
         return ApiResponse.<Void>builder()
                 .message("Xóa mã giảm giá thành công")
+                .build();
+    }
+
+    // 👇 BỔ SUNG: API Cập nhật mã giảm giá
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<CouponResponse> updateCoupon(@PathVariable String id, @RequestBody @Valid CouponRequest request) {
+        return ApiResponse.<CouponResponse>builder()
+                .message("Cập nhật mã giảm giá thành công")
+                .result(couponService.updateCoupon(id, request))
                 .build();
     }
 }

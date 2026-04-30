@@ -38,19 +38,25 @@ public class FileService implements IFileService {
             }
             String fileName = UUID.randomUUID().toString() + "_" + originalName.replaceAll("\\s+", "_");
 
+            String contentType = file.getContentType();
+            if (contentType == null || contentType.isBlank()) {
+                contentType = "application/octet-stream";
+            }
+
             minioClient.putObject(
                     PutObjectArgs.builder()
                             .bucket(bucketName)
                             .object(fileName)
-                            .stream(file.getInputStream(), file.getSize(), -1)
-                            .contentType(file.getContentType())
+                            .stream(file.getInputStream(), file.getSize(), 10485760)
+                            .contentType(contentType)
                             .build()
             );
 
             log.info("Uploaded file: {}", fileName);
             return fileName; // Chỉ trả về tên file để lưu vào Database
         } catch (Exception e) {
-            throw new RuntimeException("Lỗi khi upload file lên MinIO", e);
+            log.error("MinIO Upload Error: ", e);
+            throw new RuntimeException("Lỗi khi upload file lên MinIO: " + e.getMessage(), e);
         }
     }
 

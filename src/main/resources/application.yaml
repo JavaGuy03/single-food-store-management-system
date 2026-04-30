@@ -46,6 +46,10 @@ spring:
         jwt:
           jws-algorithms: HS512
 
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
 logging:
   level:
     root: INFO

@@ -49,6 +49,27 @@ public class CouponService implements ICouponService {
     }
 
     @Override
+    @Transactional
+    public CouponResponse updateCoupon(String id, CouponRequest request) {
+        Coupon coupon = couponRepository.findById(id)
+                .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
+
+        if (!coupon.getCode().equalsIgnoreCase(request.code()) && couponRepository.existsByCode(request.code())) {
+            throw new SystemException(SystemErrorCode.COUPON_ALREADY_EXISTS);
+        }
+
+        coupon.setCode(request.code().toUpperCase());
+        coupon.setDiscountType(request.discountType());
+        coupon.setDiscountValue(request.discountValue());
+        coupon.setMinOrderValue(request.minOrderValue());
+        coupon.setMaxDiscount(request.maxDiscount());
+        coupon.setExpiresAt(request.expiresAt());
+        coupon.setUsageLimit(request.usageLimit());
+
+        return couponMapper.mapToResponse(couponRepository.save(coupon));
+    }
+
+    @Override
     public List<CouponResponse> getAllCoupons() {
         return couponRepository.findAll().stream()
                 .map(couponMapper::mapToResponse)

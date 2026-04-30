@@ -8,6 +8,8 @@ import java.util.List;
 public record OrderResponse(
         String id,
         String userId,
+        String customerName,
+        String customerPhone,
         LocalDateTime orderDate,
         Double totalAmount,
         String status,

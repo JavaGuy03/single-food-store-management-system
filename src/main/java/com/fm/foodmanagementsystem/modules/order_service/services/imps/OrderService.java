@@ -172,7 +172,14 @@ public class OrderService implements IOrderService {
         order.setItemsSummary(itemsSummary);
         order.setTotalAmount(totalAmount);
 
-        return orderMapper.mapToResponse(orderRepository.save(order));
+        order = orderRepository.save(order);
+        try {
+            notificationService.sendNotificationToTopic("admin_orders", "Đơn hàng mới!", "Có đơn hàng mới cần xử lý.", java.util.Map.of("orderId", order.getId()));
+        } catch (Exception e) {
+            System.err.println("Failed to send notification to admin_orders topic: " + e.getMessage());
+        }
+
+        return orderMapper.mapToResponse(order);
     }
 
     @Override
@@ -187,6 +194,24 @@ public class OrderService implements IOrderService {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
         return orderMapper.mapToResponse(order);
+    }
+
+    @Override
+    @Transactional
+    public void cancelOrder(String userId, String orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
+
+        if (!order.getUserId().equals(userId)) {
+            throw new SystemException(SystemErrorCode.UNAUTHORIZED_ACTION);
+        }
+
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new SystemException(SystemErrorCode.INVALID_ORDER_STATUS_TRANSITION);
+        }
+
+        order.setStatus(OrderStatus.CANCELLED);
+        orderRepository.save(order);
     }
 
     // M3: Validate trạng thái chuyển đổi hợp lệ

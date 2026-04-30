@@ -26,6 +26,7 @@ public enum SystemErrorCode {
     COUPON_ALREADY_EXISTS(1013, "A coupon with this code already exists!", HttpStatus.CONFLICT),
     INVALID_ORDER_STATUS_TRANSITION(1014, "Invalid order status transition!", HttpStatus.BAD_REQUEST),
     USER_DISABLED(1015, "This account has been disabled!", HttpStatus.FORBIDDEN),
+    UNAUTHORIZED_ACTION(1016, "You are not authorized to perform this action!", HttpStatus.FORBIDDEN),
 
     ;
     int code;

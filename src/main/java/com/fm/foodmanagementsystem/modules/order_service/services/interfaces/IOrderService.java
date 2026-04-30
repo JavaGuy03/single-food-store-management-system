@@ -11,5 +11,6 @@ public interface IOrderService {
     List<OrderResponse> getMyOrders(String userId);
     OrderResponse getOrderById(String id);
     void updateOrderStatus(String orderId, String status);
+    void cancelOrder(String userId, String orderId);
     Page<OrderResponse> getAllOrders(String status, int page, int size);
 }
