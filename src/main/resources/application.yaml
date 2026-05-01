@@ -77,8 +77,7 @@ openapi:
     url: ${SWAGGER_SERVER_URL:http://localhost:8080}
 
 minio:
-  url: http://localhost:9000
-  # url: http://minio:9000 # (Nếu chạy app trong docker thì dùng cái này)
+  url: http://minio:9000 
   access-key: ${MINIO_ACCESS_KEY}
   secret-key: ${MINIO_SECRET_KEY}
   bucket-name: food-media
