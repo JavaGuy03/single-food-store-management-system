@@ -63,10 +63,12 @@ public class PaymentService implements IPaymentService {
         order.put("description", "Thanh toan don hang #" + orderId);
         order.put("bank_code", "");
         order.put("item", "[]");
-        order.put("embed_data", "{\"orderId\": \"" + orderId + "\"}"); // Gắn kèm orderId để lúc Query còn biết đồng mà cập nhật
+        order.put("embed_data", "{\"orderId\": \"" + orderId + "\"}"); // Gắn kèm orderId để lúc Query còn biết đồng mà
+                                                                       // cập nhật
         order.put("callback_url", zaloPayConfig.getCallbackUrl());
 
-        String data = order.get("app_id") + "|" + order.get("app_trans_id") + "|" + order.get("app_user") + "|" + order.get("amount")
+        String data = order.get("app_id") + "|" + order.get("app_trans_id") + "|" + order.get("app_user") + "|"
+                + order.get("amount")
                 + "|" + order.get("app_time") + "|" + order.get("embed_data") + "|" + order.get("item");
 
         order.put("mac", HmacUtil.HMacHexStringEncode(HmacUtil.HMACSHA256, zaloPayConfig.getKey1(), data));
@@ -80,7 +82,8 @@ public class PaymentService implements IPaymentService {
         HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
 
         try {
-            Map<String, Object> response = restTemplate.postForObject(zaloPayConfig.getCreateOrderEndpoint(), request, Map.class);
+            Map<String, Object> response = restTemplate.postForObject(zaloPayConfig.getCreateOrderEndpoint(), request,
+                    Map.class);
             if (response != null) {
                 response.put("app_trans_id", appTransId); // Trả kèm cái này về cho Mobile
 
@@ -121,7 +124,8 @@ public class PaymentService implements IPaymentService {
         HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
 
         try {
-            Map<String, Object> response = restTemplate.postForObject(zaloPayConfig.getQueryEndpoint(), request, Map.class);
+            Map<String, Object> response = restTemplate.postForObject(zaloPayConfig.getQueryEndpoint(), request,
+                    Map.class);
 
             if (response != null && response.containsKey("return_code")) {
                 int returnCode = (Integer) response.get("return_code");
@@ -135,7 +139,9 @@ public class PaymentService implements IPaymentService {
 
                     if (orderId != null) {
                         orderService.updateOrderStatus(orderId, "PAID");
-                        String zpTransId = response.containsKey("zp_trans_id") ? String.valueOf(response.get("zp_trans_id")) : null;
+                        String zpTransId = response.containsKey("zp_trans_id")
+                                ? String.valueOf(response.get("zp_trans_id"))
+                                : null;
                         updateTransactionStatus(appTransId, "SUCCESS", zpTransId);
                         response.put("order_status_update", "SUCCESS");
                         log.info("Đã cập nhật đơn hàng {} sang trạng thái PAID", orderId);
@@ -184,7 +190,7 @@ public class PaymentService implements IPaymentService {
                 if (tx.getCreatedAt().plusMinutes(1).isBefore(java.time.LocalDateTime.now())) {
                     queryZaloPayOrder(tx.getAppTransId());
                 }
-                
+
                 // Hủy giao dịch nếu treo quá 15 phút
                 if (tx.getCreatedAt().plusMinutes(15).isBefore(java.time.LocalDateTime.now())) {
                     updateTransactionStatus(tx.getAppTransId(), "FAILED", null);

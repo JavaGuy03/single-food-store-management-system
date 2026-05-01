@@ -46,6 +46,9 @@ public class Order {
     @Column(name = "coupon_code")
     String couponCode;
 
+    @Column(name = "discount_amount")
+    Double discountAmount;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     List<OrderItem> orderItems;
 }

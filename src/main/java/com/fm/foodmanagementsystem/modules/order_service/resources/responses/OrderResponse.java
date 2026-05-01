@@ -13,6 +13,8 @@ public record OrderResponse(
         LocalDateTime orderDate,
         Double totalAmount,
         String status,
+        String couponCode,
+        Double discountAmount,
         String deliveryAddress,
         String note,
         List<String> itemsSummary,

@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -22,7 +23,8 @@ public class UserDeviceController {
     @PostMapping("/register")
     @PreAuthorize("isAuthenticated()")
     public ApiResponse<Void> registerDevice(@Valid @RequestBody FcmTokenRequest request) {
-        String userId = SecurityContextHolder.getContext().getAuthentication().getName();
+        Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        String userId = jwt.getClaimAsString("user-id");
         deviceService.registerDevice(userId, request);
         return ApiResponse.<Void>builder().build();
     }

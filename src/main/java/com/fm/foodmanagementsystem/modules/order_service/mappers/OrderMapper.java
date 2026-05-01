@@ -56,6 +56,8 @@ public class OrderMapper {
                 .orderDate(order.getOrderDate())
                 .totalAmount(order.getTotalAmount())
                 .status(order.getStatus() != null ? order.getStatus().name() : null)
+                .couponCode(order.getCouponCode())
+                .discountAmount(order.getDiscountAmount())
                 .deliveryAddress(order.getDeliveryAddress())
                 .note(order.getNote())
                 .itemsSummary(order.getItemsSummary())

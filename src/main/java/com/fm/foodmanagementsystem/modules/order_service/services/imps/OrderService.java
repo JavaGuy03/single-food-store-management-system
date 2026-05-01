@@ -155,17 +155,18 @@ public class OrderService implements IOrderService {
                 throw new SystemException(SystemErrorCode.COUPON_MIN_ORDER);
             }
 
-            double discountAmount = 0.0;
+            double calculatedDiscount = 0.0;
             if ("percent".equalsIgnoreCase(coupon.getDiscountType())) {
-                discountAmount = totalAmount * (coupon.getDiscountValue() / 100.0);
-                if (coupon.getMaxDiscount() != null && discountAmount > coupon.getMaxDiscount()) {
-                    discountAmount = coupon.getMaxDiscount();
+                calculatedDiscount = totalAmount * (coupon.getDiscountValue() / 100.0);
+                if (coupon.getMaxDiscount() != null && calculatedDiscount > coupon.getMaxDiscount()) {
+                    calculatedDiscount = coupon.getMaxDiscount();
                 }
             } else if ("fixed".equalsIgnoreCase(coupon.getDiscountType())) {
-                discountAmount = coupon.getDiscountValue();
+                calculatedDiscount = coupon.getDiscountValue();
             }
 
-            totalAmount = Math.max(0, totalAmount - discountAmount);
+            order.setDiscountAmount(calculatedDiscount);
+            totalAmount = Math.max(0, totalAmount - calculatedDiscount);
 
             coupon.setUsedCount(coupon.getUsedCount() + 1);
             couponRepository.save(coupon);
@@ -260,7 +261,7 @@ public class OrderService implements IOrderService {
         orderRepository.save(order);
 
         // Báo cho Admin nếu đơn hàng vừa chuyển sang PAID (thanh toán thành công)
-        if (newStatus == OrderStatus.PAID) {
+        if (order.getStatus() == OrderStatus.PAID) {
             try {
                 notificationService.sendNotificationToTopic("admin_orders", "Đơn hàng đã thanh toán!", "Đơn hàng #" + orderId.substring(0, 8) + " vừa được thanh toán thành công.", java.util.Map.of("orderId", orderId));
             } catch (Exception e) {
