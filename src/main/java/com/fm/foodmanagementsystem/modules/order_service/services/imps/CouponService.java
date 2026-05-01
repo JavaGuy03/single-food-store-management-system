@@ -36,6 +36,7 @@ public class CouponService implements ICouponService {
                 .maxDiscount(request.maxDiscount())
                 .expiresAt(request.expiresAt())
                 .usageLimit(request.usageLimit())
+                .isActive(request.isActive() != null ? request.isActive() : true)
                 .build();
 
         return couponMapper.mapToResponse(couponRepository.save(coupon));
@@ -65,6 +66,9 @@ public class CouponService implements ICouponService {
         coupon.setMaxDiscount(request.maxDiscount());
         coupon.setExpiresAt(request.expiresAt());
         coupon.setUsageLimit(request.usageLimit());
+        if (request.isActive() != null) {
+            coupon.setIsActive(request.isActive());
+        }
 
         return couponMapper.mapToResponse(couponRepository.save(coupon));
     }

@@ -19,12 +19,11 @@ public class PaymentController {
 
     @PostMapping("/zalopay/create")
     public ApiResponse<Map<String, Object>> createPayment(
-            @RequestParam String orderId,
-            @RequestParam double amount) {
+            @RequestParam String orderId) {
 
         return ApiResponse.<Map<String, Object>>builder()
                 .message("Tạo đơn thanh toán ZaloPay thành công")
-                .result(paymentService.createZaloPayOrder(orderId, amount))
+                .result(paymentService.createZaloPayOrder(orderId))
                 .build();
     }
 

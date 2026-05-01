@@ -23,5 +23,7 @@ public record CouponRequest(
         @NotNull(message = "NOT_NULL")
         LocalDateTime expiresAt,
 
-        Integer usageLimit
+        Integer usageLimit,
+
+        Boolean isActive
 ) {}

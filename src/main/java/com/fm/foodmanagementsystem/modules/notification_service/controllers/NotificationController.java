@@ -24,7 +24,7 @@ public class NotificationController {
     public ApiResponse<Page<AppNotificationResponse>> getMyNotifications(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        String userId = SecurityContextHolder.getContext().getAuthentication().getName();
+        String userId = getUserIdFromToken();
         return ApiResponse.<Page<AppNotificationResponse>>builder()
                 .result(notificationService.getMyNotifications(userId, page, size))
                 .build();
@@ -33,7 +33,7 @@ public class NotificationController {
     @GetMapping("/unread-count")
     @PreAuthorize("isAuthenticated()")
     public ApiResponse<Long> countUnreadNotifications() {
-        String userId = SecurityContextHolder.getContext().getAuthentication().getName();
+        String userId = getUserIdFromToken();
         return ApiResponse.<Long>builder()
                 .result(notificationService.countUnreadNotifications(userId))
                 .build();
@@ -42,7 +42,7 @@ public class NotificationController {
     @PatchMapping("/{id}/read")
     @PreAuthorize("isAuthenticated()")
     public ApiResponse<Void> markAsRead(@PathVariable Long id) {
-        String userId = SecurityContextHolder.getContext().getAuthentication().getName();
+        String userId = getUserIdFromToken();
         notificationService.markAsRead(userId, id);
         return ApiResponse.<Void>builder().build();
     }
@@ -50,8 +50,13 @@ public class NotificationController {
     @PatchMapping("/read-all")
     @PreAuthorize("isAuthenticated()")
     public ApiResponse<Void> markAllAsRead() {
-        String userId = SecurityContextHolder.getContext().getAuthentication().getName();
+        String userId = getUserIdFromToken();
         notificationService.markAllAsRead(userId);
         return ApiResponse.<Void>builder().build();
+    }
+
+    private String getUserIdFromToken() {
+        org.springframework.security.oauth2.jwt.Jwt jwt = (org.springframework.security.oauth2.jwt.Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return jwt.getClaimAsString("user-id");
     }
 }

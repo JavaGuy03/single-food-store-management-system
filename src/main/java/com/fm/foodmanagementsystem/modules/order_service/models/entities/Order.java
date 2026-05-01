@@ -43,6 +43,9 @@ public class Order {
 
     String note;
 
+    @Column(name = "coupon_code")
+    String couponCode;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     List<OrderItem> orderItems;
 }

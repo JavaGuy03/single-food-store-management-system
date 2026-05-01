@@ -43,6 +43,10 @@ public class NotificationService implements INotificationService {
             log.info("Successfully sent message to token: {}. Response: {}", targetToken, response);
         } catch (Exception e) {
             log.error("Error sending FCM notification to token {}: ", targetToken, e);
+            if (e.getMessage() != null && (e.getMessage().contains("invalid token") || e.getMessage().contains("registration token"))) {
+                userDeviceRepository.findByFcmToken(targetToken).ifPresent(userDeviceRepository::delete);
+                log.info("Deleted invalid FCM token: {}", targetToken);
+            }
         }
     }
 

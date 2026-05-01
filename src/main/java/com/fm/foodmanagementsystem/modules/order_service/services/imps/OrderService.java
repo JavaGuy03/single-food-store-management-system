@@ -37,9 +37,12 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import lombok.extern.slf4j.Slf4j;
+
 @Service
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+@Slf4j
 public class OrderService implements IOrderService {
 
     OrderRepository orderRepository;
@@ -171,12 +174,15 @@ public class OrderService implements IOrderService {
         order.setOrderItems(orderItems);
         order.setItemsSummary(itemsSummary);
         order.setTotalAmount(totalAmount);
+        if (request.couponCode() != null && !request.couponCode().trim().isEmpty()) {
+            order.setCouponCode(request.couponCode().toUpperCase());
+        }
 
         order = orderRepository.save(order);
         try {
             notificationService.sendNotificationToTopic("admin_orders", "Đơn hàng mới!", "Có đơn hàng mới cần xử lý.", java.util.Map.of("orderId", order.getId()));
         } catch (Exception e) {
-            System.err.println("Failed to send notification to admin_orders topic: " + e.getMessage());
+            log.error("Failed to send notification to admin_orders topic: ", e);
         }
 
         return orderMapper.mapToResponse(order);
@@ -211,7 +217,24 @@ public class OrderService implements IOrderService {
         }
 
         order.setStatus(OrderStatus.CANCELLED);
+        
+        // Hoàn trả lượt dùng của coupon (nếu có)
+        if (order.getCouponCode() != null) {
+            couponRepository.findByCodeWithLock(order.getCouponCode()).ifPresent(coupon -> {
+                if (coupon.getUsedCount() > 0) {
+                    coupon.setUsedCount(coupon.getUsedCount() - 1);
+                    couponRepository.save(coupon);
+                }
+            });
+        }
+        
         orderRepository.save(order);
+        
+        try {
+            notificationService.sendNotificationToTopic("admin_orders", "Đơn hàng bị huỷ!", "Đơn hàng #" + orderId.substring(0, 8) + " đã bị huỷ bởi khách hàng.", java.util.Map.of("orderId", orderId));
+        } catch (Exception e) {
+            log.error("Failed to send cancellation notification to admin_orders topic: ", e);
+        }
     }
 
     // M3: Validate trạng thái chuyển đổi hợp lệ
@@ -235,6 +258,15 @@ public class OrderService implements IOrderService {
         }
 
         orderRepository.save(order);
+
+        // Báo cho Admin nếu đơn hàng vừa chuyển sang PAID (thanh toán thành công)
+        if (newStatus == OrderStatus.PAID) {
+            try {
+                notificationService.sendNotificationToTopic("admin_orders", "Đơn hàng đã thanh toán!", "Đơn hàng #" + orderId.substring(0, 8) + " vừa được thanh toán thành công.", java.util.Map.of("orderId", orderId));
+            } catch (Exception e) {
+                log.error("Failed to send PAID notification to admin_orders topic: ", e);
+            }
+        }
 
         // Gửi Notification cho khách hàng qua FCM và lưu vào DB
         String title = "Cập nhật đơn hàng #" + orderId.substring(0, 8);

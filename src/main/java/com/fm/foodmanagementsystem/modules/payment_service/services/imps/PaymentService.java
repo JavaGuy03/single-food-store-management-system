@@ -4,6 +4,7 @@ import com.fm.foodmanagementsystem.core.exception.SystemException;
 import com.fm.foodmanagementsystem.core.exception.enums.SystemErrorCode;
 import com.fm.foodmanagementsystem.modules.order_service.services.interfaces.IOrderService;
 import com.fm.foodmanagementsystem.modules.payment_service.configs.ZaloPayConfig;
+import com.fm.foodmanagementsystem.modules.order_service.models.repositories.OrderRepository;
 import com.fm.foodmanagementsystem.modules.payment_service.models.entities.PaymentTransaction;
 import com.fm.foodmanagementsystem.modules.payment_service.models.repositories.PaymentTransactionRepository;
 import com.fm.foodmanagementsystem.modules.payment_service.services.interfaces.IPaymentService;
@@ -39,6 +40,7 @@ public class PaymentService implements IPaymentService {
 
     ZaloPayConfig zaloPayConfig;
     IOrderService orderService;
+    OrderRepository orderRepository;
     PaymentTransactionRepository paymentTransactionRepository;
 
     // C4: Đánh dấu @NonFinal để Lombok không yêu cầu inject qua constructor
@@ -46,7 +48,10 @@ public class PaymentService implements IPaymentService {
     RestTemplate restTemplate = new RestTemplate();
 
     @Override
-    public Map<String, Object> createZaloPayOrder(String orderId, double amount) {
+    public Map<String, Object> createZaloPayOrder(String orderId) {
+        double amount = orderRepository.findById(orderId)
+                .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND))
+                .getTotalAmount();
         String appTransId = getCurrentTimeString("yyMMdd") + "_" + System.currentTimeMillis();
 
         Map<String, Object> order = new HashMap<>();
@@ -130,7 +135,8 @@ public class PaymentService implements IPaymentService {
 
                     if (orderId != null) {
                         orderService.updateOrderStatus(orderId, "PAID");
-                        updateTransactionStatus(appTransId, "SUCCESS");
+                        String zpTransId = response.containsKey("zp_trans_id") ? String.valueOf(response.get("zp_trans_id")) : null;
+                        updateTransactionStatus(appTransId, "SUCCESS", zpTransId);
                         response.put("order_status_update", "SUCCESS");
                         log.info("Đã cập nhật đơn hàng {} sang trạng thái PAID", orderId);
                     } else {
@@ -139,7 +145,7 @@ public class PaymentService implements IPaymentService {
                     }
                 } else if (returnCode == 2) {
                     // Thanh toán THẤT BẠI
-                    updateTransactionStatus(appTransId, "FAILED");
+                    updateTransactionStatus(appTransId, "FAILED", null);
                 }
             }
             return response;
@@ -156,9 +162,12 @@ public class PaymentService implements IPaymentService {
                 .orElse(null);
     }
 
-    private void updateTransactionStatus(String appTransId, String status) {
+    private void updateTransactionStatus(String appTransId, String status, String zpTransId) {
         paymentTransactionRepository.findByAppTransId(appTransId).ifPresent(tx -> {
             tx.setStatus(status);
+            if (zpTransId != null) {
+                tx.setZpTransId(zpTransId);
+            }
             paymentTransactionRepository.save(tx);
         });
     }
@@ -178,7 +187,7 @@ public class PaymentService implements IPaymentService {
                 
                 // Hủy giao dịch nếu treo quá 15 phút
                 if (tx.getCreatedAt().plusMinutes(15).isBefore(java.time.LocalDateTime.now())) {
-                    updateTransactionStatus(tx.getAppTransId(), "FAILED");
+                    updateTransactionStatus(tx.getAppTransId(), "FAILED", null);
                 }
             }
         }
