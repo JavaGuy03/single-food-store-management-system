@@ -23,9 +23,16 @@ public interface OrderRepository extends JpaRepository<Order, String> {
     @EntityGraph(attributePaths = {"orderItems", "orderItems.food"})
     java.util.Optional<Order> findById(String id);
 
+    @EntityGraph(attributePaths = {"orderItems", "orderItems.food"})
     Page<Order> findAllByStatus(OrderStatus status, Pageable pageable);
 
+    @Override
+    @EntityGraph(attributePaths = {"orderItems", "orderItems.food"})
+    Page<Order> findAll(Pageable pageable);
+
     boolean existsByUserIdAndStatusIn(String userId, Collection<OrderStatus> statuses);
+
+    boolean existsByCouponCodeAndStatus(String couponCode, OrderStatus status);
 
     // Đếm số đơn trong ngày (không tính đơn Hủy)
     @Query("SELECT COUNT(o) FROM Order o WHERE o.orderDate >= :startOfDay AND o.orderDate <= :endOfDay AND o.status != 'CANCELLED'")

@@ -18,6 +18,7 @@ public class CouponMapper {
                 .expiresAt(coupon.getExpiresAt())
                 .usageLimit(coupon.getUsageLimit())
                 .usedCount(coupon.getUsedCount())
+                .reservedCount(coupon.getReservedCount() != null ? coupon.getReservedCount() : 0)
                 .isActive(coupon.getIsActive())
                 .build();
     }

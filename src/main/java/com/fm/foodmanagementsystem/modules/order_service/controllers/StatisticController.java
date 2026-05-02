@@ -23,29 +23,48 @@ public class StatisticController {
 
     IStatisticService statisticService;
 
-    // API lấy dữ liệu 3 cục cho màn hình Mobile
-    @GetMapping("/dashboard")
-    @PreAuthorize("hasAnyRole('ADMIN')")
-    public ApiResponse<DashboardStatisticResponse> getDashboard() {
+    /** Dashboard quản trị chi nhánh — chỉ ADMIN (không dùng cho app khách). */
+    @GetMapping("/admin/dashboard")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<DashboardStatisticResponse> getAdminDashboard() {
         return ApiResponse.<DashboardStatisticResponse>builder()
                 .result(statisticService.getDashboardOverview())
                 .build();
     }
 
-    // API Xuất file Excel
+    /**
+     * @deprecated Dùng {@link #getAdminDashboard()} — {@code GET /api/v1/statistics/admin/dashboard}.
+     */
+    @Deprecated
+    @GetMapping("/dashboard")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<DashboardStatisticResponse> getDashboardLegacy() {
+        return getAdminDashboard();
+    }
+
+    @GetMapping("/admin/export-revenue")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<byte[]> exportAdminRevenue(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return buildExportRevenueResponse(date);
+    }
+
+    /**
+     * @deprecated Dùng {@link #exportAdminRevenue(LocalDate)} — {@code GET /api/v1/statistics/admin/export-revenue}.
+     */
+    @Deprecated
     @GetMapping("/export-revenue")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<byte[]> exportRevenue(
+    public ResponseEntity<byte[]> exportRevenueLegacy(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return buildExportRevenueResponse(date);
+    }
 
-        // Nếu không truyền ngày, mặc định lấy ngày hôm nay
+    private ResponseEntity<byte[]> buildExportRevenueResponse(LocalDate date) {
         LocalDate targetDate = (date != null) ? date : LocalDate.now();
-
         byte[] excelContent = statisticService.exportDailyRevenueReport(targetDate);
-        String fileName = "Doanh_Thu_" + targetDate.toString() + ".xlsx";
-
+        String fileName = "Doanh_Thu_" + targetDate + ".xlsx";
         return ResponseEntity.ok()
-                // Header này ép trình duyệt/điện thoại phải hiện bảng tải file về
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
                 .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .body(excelContent);

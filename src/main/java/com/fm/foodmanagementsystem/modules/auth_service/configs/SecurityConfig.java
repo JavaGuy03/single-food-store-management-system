@@ -21,6 +21,7 @@ import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -41,11 +42,20 @@ public class SecurityConfig {
     private String ALGORITHM;
 
     private static final String[] PUBLIC_MATCHERS = {
+            // Auth & Swagger
             "/api/v1/auth/**",
-            "/api/v1/media/**",
             "/v3/api-docs/**",
             "/swagger-ui/**",
-            "/swagger-ui.html"
+            "/swagger-ui.html",
+            // Public browsing (khách xem menu trước khi đăng nhập)
+            "/api/v1/foods/**",
+            "/api/v1/categories/**",
+            "/api/v1/options/food/**",
+            "/api/v1/settings/store",
+            "/api/v1/settings/banners",
+            "/api/v1/interactions/foods/*/rating",
+            "/api/v1/interactions/reviews",
+            "/api/v1/coupons/*",
     };
 
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
@@ -64,6 +74,7 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(request ->
                         request
+                                .requestMatchers(HttpMethod.GET, "/api/v1/media/**").permitAll()
                                 .requestMatchers(PUBLIC_MATCHERS).permitAll()
                                 .anyRequest().authenticated()
                 )

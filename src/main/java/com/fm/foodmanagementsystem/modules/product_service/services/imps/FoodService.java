@@ -65,6 +65,14 @@ public class FoodService implements IFoodService {
     }
 
     @Override
+    public List<FoodResponse> getAllFoodsAdmin() {
+        // Admin: trả về tất cả món (bao gồm cả đã ngừng bán) để quản lý
+        return foodRepository.findAllWithGraphs().stream()
+                .map(food -> foodMapper.mapToResponse(food, food.getOptionGroups()))
+                .toList();
+    }
+
+    @Override
     public List<FoodResponse> getFoodsByCategory(Long categoryId) {
         return foodRepository.findAllByCategoryIdAndIsAvailableTrue(categoryId).stream()
                 .map(food -> foodMapper.mapToResponse(food, food.getOptionGroups()))
@@ -72,7 +80,17 @@ public class FoodService implements IFoodService {
     }
 
     @Override
-    public FoodResponse getFoodById(Long id) {
+    public FoodResponse getFoodByIdForCustomer(Long id) {
+        Food food = foodRepository.findById(id)
+                .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
+        if (!food.getIsAvailable()) {
+            throw new SystemException(SystemErrorCode.DATA_NOT_FOUND);
+        }
+        return foodMapper.mapToResponse(food, food.getOptionGroups());
+    }
+
+    @Override
+    public FoodResponse getFoodByIdForAdmin(Long id) {
         Food food = foodRepository.findById(id)
                 .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
         return foodMapper.mapToResponse(food, food.getOptionGroups());

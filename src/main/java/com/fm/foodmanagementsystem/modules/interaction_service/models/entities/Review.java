@@ -10,7 +10,11 @@ import lombok.experimental.FieldDefaults;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "reviews")
+@Table(name = "reviews",
+        uniqueConstraints = {
+                // C-6: One review per food item per order — prevents duplicate ratings per order line
+                @UniqueConstraint(name = "uk_reviews_order_food", columnNames = {"order_id", "food_id"})
+        })
 @Getter
 @Setter
 @NoArgsConstructor
@@ -30,6 +34,11 @@ public class Review {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false)
     Order order;
+
+    // C-6 FIX: Direct FK to Food — one review per food item, enables accurate per-food ratings
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "food_id", nullable = false)
+    Food food;
 
     @Column(nullable = false)
     Integer rating; // 1 to 5

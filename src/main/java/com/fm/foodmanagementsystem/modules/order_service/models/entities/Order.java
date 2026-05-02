@@ -49,6 +49,10 @@ public class Order {
     @Column(name = "discount_amount")
     Double discountAmount;
 
+    /** Phí giao hàng áp dụng cho đơn (0 nếu đạt ngưỡng freeship). */
+    @Column(name = "shipping_fee")
+    Double shippingFee;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     List<OrderItem> orderItems;
 }

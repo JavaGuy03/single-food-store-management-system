@@ -55,20 +55,32 @@ public class InteractionService implements IInteractionService {
                 .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
 
         if (!order.getUserId().equals(userId)) {
-            throw new SystemException(SystemErrorCode.INVALID_PARAMETER);
+            throw new SystemException(SystemErrorCode.UNAUTHORIZED_ACTION);
         }
 
         if (order.getStatus() != OrderStatus.COMPLETED) {
             throw new SystemException(SystemErrorCode.INVALID_PARAMETER); // Chỉ cho phép đánh giá đơn COMPLETED
         }
 
-        if (reviewRepository.findByOrderId(order.getId()).isPresent()) {
-            throw new SystemException(SystemErrorCode.DATA_IS_IN_USE); // Đã đánh giá rồi
+        // C-6 FIX: Validate the foodId actually belongs to this order’s items
+        boolean foodInOrder = order.getOrderItems().stream()
+                .anyMatch(item -> item.getFood().getId().equals(request.foodId()));
+        if (!foodInOrder) {
+            throw new SystemException(SystemErrorCode.INVALID_PARAMETER);
         }
+
+        // C-6: Duplicate check — one review per (order, food)
+        if (reviewRepository.existsByOrderIdAndFoodId(order.getId(), request.foodId())) {
+            throw new SystemException(SystemErrorCode.DATA_IS_IN_USE);
+        }
+
+        Food food = foodRepository.findById(request.foodId())
+                .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
 
         Review review = Review.builder()
                 .user(user)
                 .order(order)
+                .food(food) // C-6: Set the food FK
                 .rating(request.rating())
                 .comment(request.comment())
                 .build();
@@ -140,6 +152,8 @@ public class InteractionService implements IInteractionService {
                 .userId(review.getUser().getId())
                 .userFullName(review.getUser().getFirstName() + " " + review.getUser().getLastName())
                 .orderId(review.getOrder().getId())
+                .foodId(review.getFood().getId())        // C-6
+                .foodName(review.getFood().getName())    // C-6
                 .rating(review.getRating())
                 .comment(review.getComment())
                 .createdAt(review.getCreatedAt())

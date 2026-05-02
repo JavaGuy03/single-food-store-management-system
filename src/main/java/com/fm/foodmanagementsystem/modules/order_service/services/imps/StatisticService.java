@@ -62,7 +62,16 @@ public class StatisticService implements IStatisticService {
 
             // Tạo Header
             Row headerRow = sheet.createRow(0);
-            String[] columns = { "Mã Đơn Hàng", "Thời Gian", "Tổng Tiền", "Trạng Thái", "Địa Chỉ Giao" };
+            String[] columns = {
+                    "Mã Đơn Hàng",
+                    "Thời Gian",
+                    "Tiền Hàng",
+                    "Phí Ship",
+                    "Giảm Giá",
+                    "Thành Tiền",
+                    "Trạng Thái",
+                    "Địa Chỉ Giao"
+            };
 
             // Format Header in đậm
             CellStyle headerStyle = workbook.createCellStyle();
@@ -83,18 +92,25 @@ public class StatisticService implements IStatisticService {
 
             for (Order order : completedOrders) {
                 Row row = sheet.createRow(rowIdx++);
+                double shipping = order.getShippingFee() != null ? order.getShippingFee() : 0.0;
+                double discount = order.getDiscountAmount() != null ? order.getDiscountAmount() : 0.0;
+                double itemsAmount = order.getTotalAmount() - shipping + discount;
+
                 row.createCell(0).setCellValue(order.getId());
                 row.createCell(1).setCellValue(order.getOrderDate().format(formatter));
-                row.createCell(2).setCellValue(order.getTotalAmount());
-                row.createCell(3).setCellValue(order.getStatus().name());
-                row.createCell(4).setCellValue(order.getDeliveryAddress());
+                row.createCell(2).setCellValue(itemsAmount);
+                row.createCell(3).setCellValue(shipping);
+                row.createCell(4).setCellValue(discount);
+                row.createCell(5).setCellValue(order.getTotalAmount());
+                row.createCell(6).setCellValue(order.getStatus().name());
+                row.createCell(7).setCellValue(order.getDeliveryAddress());
                 totalDayRevenue += order.getTotalAmount();
             }
 
             // Dòng tổng kết cuối cùng
             Row totalRow = sheet.createRow(rowIdx + 1);
-            totalRow.createCell(1).setCellValue("TỔNG DOANH THU CẢ NGÀY:");
-            totalRow.createCell(2).setCellValue(totalDayRevenue);
+            totalRow.createCell(1).setCellValue("TỔNG DOANH THU CẢ NGÀY (Thành Tiền):");
+            totalRow.createCell(5).setCellValue(totalDayRevenue);
 
             // Auto-size các cột cho đẹp
             for (int i = 0; i < columns.length; i++) {

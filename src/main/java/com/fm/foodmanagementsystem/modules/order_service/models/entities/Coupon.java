@@ -43,6 +43,11 @@ public class Coupon {
     @Builder.Default
     Integer usedCount = 0;
 
+    /** Đơn PENDING đang giữ slot coupon (chưa tính vào usedCount cho đến khi PAID). */
+    @Column(name = "reserved_count", nullable = false)
+    @Builder.Default
+    Integer reservedCount = 0;
+
     @Column(name = "is_active", nullable = false)
     @Builder.Default
     Boolean isActive = true;

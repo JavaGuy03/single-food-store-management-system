@@ -32,7 +32,9 @@ public class UserDeviceController {
     @DeleteMapping("/unregister")
     @PreAuthorize("isAuthenticated()")
     public ApiResponse<Void> unregisterDevice(@RequestParam String fcmToken) {
-        deviceService.unregisterDevice(fcmToken);
+        Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        String userId = jwt.getClaimAsString("user-id");
+        deviceService.unregisterDevice(userId, fcmToken);
         return ApiResponse.<Void>builder().build();
     }
 }

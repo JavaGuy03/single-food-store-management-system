@@ -12,6 +12,7 @@ public record OrderResponse(
         String customerPhone,
         LocalDateTime orderDate,
         Double totalAmount,
+        Double shippingFee,
         String status,
         String couponCode,
         Double discountAmount,

@@ -51,7 +51,14 @@ public class UserDeviceService implements IUserDeviceService {
 
     @Override
     @Transactional
-    public void unregisterDevice(String fcmToken) {
-        deviceRepository.findByFcmToken(fcmToken).ifPresent(deviceRepository::delete);
+    public void unregisterDevice(String userId, String fcmToken) {
+        UserDevice device = deviceRepository.findByFcmToken(fcmToken).orElse(null);
+        if (device == null) {
+            return;
+        }
+        if (!device.getUser().getId().equals(userId)) {
+            throw new SystemException(SystemErrorCode.UNAUTHORIZED_ACTION);
+        }
+        deviceRepository.delete(device);
     }
 }

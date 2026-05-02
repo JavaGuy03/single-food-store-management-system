@@ -25,6 +25,7 @@ public class OrderController {
     IOrderService orderService;
 
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<OrderResponse> create(@RequestBody @Valid OrderRequest request) {
         // C1: Lấy user-id (UUID) từ JWT claim thay vì dùng email
         String userId = getUserIdFromToken();
@@ -35,6 +36,7 @@ public class OrderController {
     }
 
     @GetMapping("/my-orders")
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<List<OrderResponse>> getMyOrders() {
         // C2: Lấy user-id (UUID) từ JWT claim thay vì dùng email
         String userId = getUserIdFromToken();
@@ -44,13 +46,16 @@ public class OrderController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<OrderResponse> getById(@PathVariable String id) {
+        String userId = getUserIdFromToken();
         return ApiResponse.<OrderResponse>builder()
-                .result(orderService.getOrderById(id))
+                .result(orderService.getOrderById(id, userId))
                 .build();
     }
 
     @PostMapping("/{id}/cancel")
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<Void> cancelOrder(@PathVariable String id) {
         String userId = getUserIdFromToken();
         orderService.cancelOrder(userId, id);

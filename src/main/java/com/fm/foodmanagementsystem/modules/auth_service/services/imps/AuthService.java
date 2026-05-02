@@ -132,6 +132,9 @@ public class AuthService implements IAuthService {
 
         if (pendingUser.getRoles() != null && !pendingUser.getRoles().isEmpty()) {
             List<Role> roles = roleRepository.findAllById(pendingUser.getRoles());
+            if (roles.size() != pendingUser.getRoles().size()) {
+                throw new SystemException(SystemErrorCode.DATA_NOT_FOUND);
+            }
             user.setRoles(new HashSet<>(roles));
         }
 
@@ -193,7 +196,7 @@ public class AuthService implements IAuthService {
         String redisKey = "otp:" + type + ":" + email;
 
         redisCacheService.set(redisKey, otp, 5, TimeUnit.MINUTES);
-        log.info("MÃ OTP CHO {} (Loại: {}) LÀ: {}", email, type, otp); // Vẫn giữ log để test nhanh trên console
+        // NOTE: OTP is intentionally NOT logged here for security. Use email delivery only.
 
         // 👇 GỌI EMAIL SERVICE ĐỂ GỬI MAIL THẬT 👇
         try {

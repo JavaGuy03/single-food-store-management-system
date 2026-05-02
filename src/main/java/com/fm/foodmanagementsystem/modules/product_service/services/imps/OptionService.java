@@ -36,6 +36,10 @@ public class OptionService implements IOptionService {
         Food food = foodRepository.findById(foodId)
                 .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
 
+        if (request.minSelect() > request.maxSelect()) {
+            throw new SystemException(SystemErrorCode.INVALID_PARAMETER);
+        }
+
         OptionGroup group = new OptionGroup();
         group.setName(request.name());
         group.setMinSelect(request.minSelect());
@@ -68,6 +72,21 @@ public class OptionService implements IOptionService {
 
     @Override
     public List<OptionGroupResponse> getOptionsByFoodId(Long foodId) {
+        Food food = foodRepository.findById(foodId)
+                .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
+        if (!food.getIsAvailable()) {
+            throw new SystemException(SystemErrorCode.DATA_NOT_FOUND);
+        }
+        return optionGroupRepository.findAllByFoodId(foodId).stream()
+                .map(optionMapper::mapToGroupResponse)
+                .toList();
+    }
+
+    @Override
+    public List<OptionGroupResponse> getOptionsByFoodIdForAdmin(Long foodId) {
+        if (!foodRepository.existsById(foodId)) {
+            throw new SystemException(SystemErrorCode.DATA_NOT_FOUND);
+        }
         return optionGroupRepository.findAllByFoodId(foodId).stream()
                 .map(optionMapper::mapToGroupResponse)
                 .toList();
@@ -81,6 +100,9 @@ public class OptionService implements IOptionService {
 
         // Cập nhật thông tin Group
         group.setName(request.name());
+        if (request.minSelect() > request.maxSelect()) {
+            throw new SystemException(SystemErrorCode.INVALID_PARAMETER);
+        }
         group.setMinSelect(request.minSelect());
         group.setMaxSelect(request.maxSelect());
 

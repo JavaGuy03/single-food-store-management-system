@@ -27,6 +27,7 @@ public enum SystemErrorCode {
     INVALID_ORDER_STATUS_TRANSITION(1014, "Invalid order status transition!", HttpStatus.BAD_REQUEST),
     USER_DISABLED(1015, "This account has been disabled!", HttpStatus.FORBIDDEN),
     UNAUTHORIZED_ACTION(1016, "You are not authorized to perform this action!", HttpStatus.FORBIDDEN),
+    STORE_CLOSED(1017, "The restaurant is not accepting orders right now.", HttpStatus.BAD_REQUEST),
 
     ;
     int code;

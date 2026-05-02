@@ -21,7 +21,6 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -50,6 +49,9 @@ public class UserService implements IUserService {
 
         if (request.roles() != null && !request.roles().isEmpty()) {
             List<Role> roles = roleRepository.findAllById(request.roles());
+            if (roles.size() != request.roles().size()) {
+                throw new SystemException(SystemErrorCode.DATA_NOT_FOUND);
+            }
             user.setRoles(new HashSet<>(roles));
         }
 
@@ -87,6 +89,9 @@ public class UserService implements IUserService {
 
         if (roleNames != null && !roleNames.isEmpty()) {
             List<Role> roles = roleRepository.findAllById(roleNames);
+            if (roles.size() != roleNames.size()) {
+                throw new SystemException(SystemErrorCode.DATA_NOT_FOUND);
+            }
             user.setRoles(new HashSet<>(roles));
         } else {
             user.getRoles().clear();
@@ -103,12 +108,8 @@ public class UserService implements IUserService {
         return userMapper.mapToUserResponse(user);
     }
 
-    @Override
-    public UserResponse getMe() {
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByEmail(email).orElseThrow(() -> new SystemException(SystemErrorCode.USER_NOT_EXISTED));
-        return userMapper.mapToUserResponse(user);
-    }
+    // getMe() removed: UserController.getMyInfo() now calls getUserById(userId) via JWT user-id claim
+    // This eliminates the only remaining email-based (getName()) lookup in the codebase
 
     @Override
     public Page<UserResponse> getAllUsers(String search, String role, int page, int size) {

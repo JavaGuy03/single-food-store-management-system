@@ -38,6 +38,15 @@ public class FoodController {
                 .build();
     }
 
+    // Admin: Xem tất cả món bao gồm cả đã ẩn/ngừng bán
+    @GetMapping("/admin/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<List<FoodResponse>> getAllForAdmin() {
+        return ApiResponse.<List<FoodResponse>>builder()
+                .result(foodService.getAllFoodsAdmin())
+                .build();
+    }
+
     @GetMapping("/category/{categoryId}")
     public ApiResponse<List<FoodResponse>> getByCategoryId(@PathVariable Long categoryId) {
         return ApiResponse.<List<FoodResponse>>builder()
@@ -45,10 +54,18 @@ public class FoodController {
                 .build();
     }
 
+    @GetMapping("/admin/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<FoodResponse> getByIdForAdmin(@PathVariable Long id) {
+        return ApiResponse.<FoodResponse>builder()
+                .result(foodService.getFoodByIdForAdmin(id))
+                .build();
+    }
+
     @GetMapping("/{id}")
     public ApiResponse<FoodResponse> getById(@PathVariable Long id) {
         return ApiResponse.<FoodResponse>builder()
-                .result(foodService.getFoodById(id))
+                .result(foodService.getFoodByIdForCustomer(id))
                 .build();
     }
 

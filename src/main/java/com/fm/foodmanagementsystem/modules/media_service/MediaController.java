@@ -2,6 +2,7 @@ package com.fm.foodmanagementsystem.modules.media_service;
 
 import com.fm.foodmanagementsystem.core.services.interfaces.IFileService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +17,7 @@ public class MediaController {
 
     // API Test Upload Ảnh (Sau này sẽ gọi ngầm trong lúc tạo Food/Category)
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> upload(@RequestParam("file") MultipartFile file) {
         return ResponseEntity.ok(fileService.uploadFile(file));
     }

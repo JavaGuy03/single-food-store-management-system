@@ -4,5 +4,5 @@ import com.fm.foodmanagementsystem.modules.auth_service.resources.requests.FcmTo
 
 public interface IUserDeviceService {
     void registerDevice(String userId, FcmTokenRequest request);
-    void unregisterDevice(String fcmToken);
+    void unregisterDevice(String userId, String fcmToken);
 }

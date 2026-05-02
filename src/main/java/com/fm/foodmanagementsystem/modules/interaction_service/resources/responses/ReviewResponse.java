@@ -10,6 +10,8 @@ public record ReviewResponse(
         String userId,
         String userFullName,
         String orderId,
+        Long foodId,       // C-6: which food was rated
+        String foodName,   // C-6: food name for display
         Integer rating,
         String comment,
         LocalDateTime createdAt

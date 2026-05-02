@@ -5,6 +5,7 @@ import com.fm.foodmanagementsystem.modules.payment_service.services.interfaces.I
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -18,6 +19,7 @@ public class PaymentController {
     IPaymentService paymentService;
 
     @PostMapping("/zalopay/create")
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<Map<String, Object>> createPayment(
             @RequestParam String orderId) {
 
@@ -28,6 +30,7 @@ public class PaymentController {
     }
 
     @PostMapping("/zalopay/query")
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<Map<String, Object>> queryPayment(
             @RequestParam String appTransId) {
 

@@ -85,8 +85,18 @@ public class UserAddressService implements IUserAddressService {
         UserAddress address = addressRepository.findById(addressId)
                 .filter(a -> a.getUser().getId().equals(userId))
                 .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
-        
+
+        boolean wasDefault = Boolean.TRUE.equals(address.getIsDefault());
         addressRepository.delete(address);
+
+        if (wasDefault) {
+            List<UserAddress> remaining = addressRepository.findAllByUserId(userId);
+            if (!remaining.isEmpty()) {
+                UserAddress promoted = remaining.getFirst();
+                promoted.setIsDefault(true);
+                addressRepository.save(promoted);
+            }
+        }
     }
 
     @Override

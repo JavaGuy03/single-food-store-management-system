@@ -11,4 +11,5 @@ import java.util.Optional;
 public interface PaymentTransactionRepository extends JpaRepository<PaymentTransaction, Long> {
     Optional<PaymentTransaction> findByAppTransId(String appTransId);
     List<PaymentTransaction> findByStatus(String status);
+    boolean existsByOrderIdAndStatus(String orderId, String status);
 }

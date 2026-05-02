@@ -44,6 +44,7 @@ public class OrderMapper {
                 .customerPhone(customerPhone)
                 .orderDate(order.getOrderDate())
                 .totalAmount(order.getTotalAmount())
+                .shippingFee(order.getShippingFee() != null ? order.getShippingFee() : 0.0)
                 .status(order.getStatus() != null ? order.getStatus().name() : null)
                 .couponCode(order.getCouponCode())
                 .discountAmount(order.getDiscountAmount())

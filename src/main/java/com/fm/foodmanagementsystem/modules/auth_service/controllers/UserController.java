@@ -76,9 +76,13 @@ public class UserController {
     }
 
     @GetMapping("/my-info")
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<UserResponse> getMyInfo() {
+        // Fix: use JWT user-id claim (UUID) instead of email-based getName() lookup
+        Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        String userId = jwt.getClaimAsString("user-id");
         return ApiResponse.<UserResponse>builder()
-                .result(userService.getMe())
+                .result(userService.getUserById(userId))
                 .build();
     }
 

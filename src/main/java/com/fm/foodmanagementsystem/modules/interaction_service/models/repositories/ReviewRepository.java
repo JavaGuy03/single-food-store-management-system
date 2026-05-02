@@ -7,19 +7,18 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
-import java.util.Optional;
-
 @Repository
 public interface ReviewRepository extends JpaRepository<Review, Long> {
+
     Page<Review> findAllByOrderByCreatedAtDesc(Pageable pageable);
-    
-    // Custom query to get average rating of a food item by joining with order_items
-    @Query("SELECT AVG(r.rating) FROM Review r JOIN r.order o JOIN o.orderItems oi WHERE oi.food.id = :foodId")
+
+    // C-6 FIX: Direct FK query — no more Cartesian JOIN, no inflation, accurate results
+    @Query("SELECT AVG(r.rating) FROM Review r WHERE r.food.id = :foodId")
     Double getAverageRatingByFoodId(Long foodId);
 
-    // M-2 FIX: DISTINCT prevents count inflation from Cartesian JOIN across multiple order_items
-    @Query("SELECT COUNT(DISTINCT r.id) FROM Review r JOIN r.order o JOIN o.orderItems oi WHERE oi.food.id = :foodId")
+    @Query("SELECT COUNT(r) FROM Review r WHERE r.food.id = :foodId")
     Long countByFoodId(Long foodId);
 
-    Optional<Review> findByOrderId(String orderId);
+    // C-6: Check if a review already exists for this (order, food) combination
+    boolean existsByOrderIdAndFoodId(String orderId, Long foodId);
 }

@@ -15,7 +15,6 @@ public interface IUserService {
     UserResponse updateUserRoles(String id, List<String> roleNames);
 
     UserResponse getUserById(String id);
-    UserResponse getMe();
 
     // Đã gộp hàm search và filter role vào đây
     Page<UserResponse> getAllUsers(String search, String role, int page, int size);

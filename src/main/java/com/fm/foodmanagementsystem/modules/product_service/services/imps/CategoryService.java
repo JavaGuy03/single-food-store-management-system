@@ -85,6 +85,10 @@ public class CategoryService implements ICategoryService {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
 
+        if (!category.getName().equals(request.name()) && categoryRepository.existsByName(request.name())) {
+            throw new SystemException(SystemErrorCode.DATA_IS_IN_USE);
+        }
+
         category.setName(request.name());
         category.setDescription(request.description());
 

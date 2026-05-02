@@ -18,6 +18,8 @@ import com.fm.foodmanagementsystem.modules.order_service.resources.requests.Orde
 import com.fm.foodmanagementsystem.modules.order_service.resources.requests.OrderRequest;
 import com.fm.foodmanagementsystem.modules.order_service.resources.responses.OrderResponse;
 import com.fm.foodmanagementsystem.modules.order_service.services.interfaces.IOrderService;
+import com.fm.foodmanagementsystem.modules.setting_service.resources.responses.StoreSettingResponse;
+import com.fm.foodmanagementsystem.modules.setting_service.services.interfaces.ISettingService;
 import com.fm.foodmanagementsystem.modules.product_service.models.entities.Food;
 import com.fm.foodmanagementsystem.modules.product_service.models.entities.OptionGroup;
 import com.fm.foodmanagementsystem.modules.product_service.models.entities.OptionItem;
@@ -54,6 +56,7 @@ public class OrderService implements IOrderService {
     OrderMapper orderMapper;
     INotificationService notificationService;
     AppNotificationRepository appNotificationRepository;
+    ISettingService settingService;
 
     // M3: Định nghĩa luồng chuyển trạng thái hợp lệ
     private static final Map<OrderStatus, Set<OrderStatus>> VALID_TRANSITIONS = Map.of(
@@ -74,6 +77,11 @@ public class OrderService implements IOrderService {
 
         if (!isActiveUser) {
             throw new SystemException(SystemErrorCode.USER_DISABLED);
+        }
+
+        StoreSettingResponse store = settingService.getStoreSetting();
+        if (Boolean.FALSE.equals(store.isOpen())) {
+            throw new SystemException(SystemErrorCode.STORE_CLOSED);
         }
 
         Order order = new Order();
@@ -102,6 +110,9 @@ public class OrderService implements IOrderService {
             List<OptionItem> selectedOptions = new ArrayList<>();
             if (itemReq.selectedOptionIds() != null && !itemReq.selectedOptionIds().isEmpty()) {
                 selectedOptions = optionItemRepository.findAllById(itemReq.selectedOptionIds());
+                if (selectedOptions.size() != itemReq.selectedOptionIds().size()) {
+                    throw new SystemException(SystemErrorCode.INVALID_PARAMETER);
+                }
             }
 
             Map<Long, Long> submittedCountByGroupId = selectedOptions.stream()
@@ -139,7 +150,16 @@ public class OrderService implements IOrderService {
             itemsSummary.add(summary);
         }
 
-        // ÁP DỤNG KHOÁ PESSIMISTIC CHO COUPON
+        double itemsSubtotal = totalAmount;
+        double baseShipping = store.baseShippingFee() != null ? store.baseShippingFee() : 0.0;
+        boolean freeShip = store.freeShipThreshold() != null && itemsSubtotal >= store.freeShipThreshold();
+        double shippingFee = freeShip ? 0.0 : baseShipping;
+        order.setShippingFee(shippingFee);
+
+        double payableBeforeDiscount = itemsSubtotal + shippingFee;
+        totalAmount = payableBeforeDiscount;
+
+        // ÁP DỤNG KHOÁ PESSIMISTIC CHO COUPON (đơn tối thiểu theo tiền hàng; giảm giá trên tiền hàng + ship)
         if (request.couponCode() != null && !request.couponCode().trim().isEmpty()) {
             Coupon coupon = couponRepository.findByCodeWithLock(request.couponCode().toUpperCase())
                     .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
@@ -148,28 +168,34 @@ public class OrderService implements IOrderService {
             if (!coupon.getIsActive() || coupon.getExpiresAt().isBefore(LocalDateTime.now())) {
                 throw new SystemException(SystemErrorCode.COUPON_EXPIRED);
             }
-            if (coupon.getUsageLimit() != null && coupon.getUsedCount() >= coupon.getUsageLimit()) {
+            int committed = nz(coupon.getUsedCount()) + nz(coupon.getReservedCount());
+            if (coupon.getUsageLimit() != null && committed >= coupon.getUsageLimit()) {
                 throw new SystemException(SystemErrorCode.COUPON_USAGE_LIMIT);
             }
-            if (coupon.getMinOrderValue() != null && totalAmount < coupon.getMinOrderValue()) {
+            if (coupon.getMinOrderValue() != null && itemsSubtotal < coupon.getMinOrderValue()) {
                 throw new SystemException(SystemErrorCode.COUPON_MIN_ORDER);
             }
 
             double calculatedDiscount = 0.0;
             if ("PERCENTAGE".equalsIgnoreCase(coupon.getDiscountType())) {
-                calculatedDiscount = totalAmount * (coupon.getDiscountValue() / 100.0);
+                calculatedDiscount = payableBeforeDiscount * (coupon.getDiscountValue() / 100.0);
                 if (coupon.getMaxDiscount() != null && calculatedDiscount > coupon.getMaxDiscount()) {
                     calculatedDiscount = coupon.getMaxDiscount();
                 }
             } else if ("FIXED".equalsIgnoreCase(coupon.getDiscountType())) {
                 calculatedDiscount = coupon.getDiscountValue();
+            } else {
+                throw new SystemException(SystemErrorCode.INVALID_PARAMETER);
             }
 
-            order.setDiscountAmount(calculatedDiscount);
-            totalAmount = Math.max(0, totalAmount - calculatedDiscount);
+            double actualDiscount = Math.min(calculatedDiscount, payableBeforeDiscount);
+            order.setDiscountAmount(actualDiscount);
+            totalAmount = Math.max(0.0, payableBeforeDiscount - actualDiscount);
 
-            coupon.setUsedCount(coupon.getUsedCount() + 1);
+            coupon.setReservedCount(nz(coupon.getReservedCount()) + 1);
             couponRepository.save(coupon);
+        } else {
+            order.setDiscountAmount(0.0);
         }
 
         order.setOrderItems(orderItems);
@@ -193,15 +219,26 @@ public class OrderService implements IOrderService {
 
     @Override
     public List<OrderResponse> getMyOrders(String userId) {
+        // Fetch user once, pass into all order mappings — avoids N+1 and "Không rõ" customer info
+        User customer = userRepository.findById(userId).orElse(null);
         return orderRepository.findAllByUserId(userId).stream()
-                .map(orderMapper::mapToResponse)
+                .map(order -> orderMapper.mapToResponse(order, customer))
                 .toList();
     }
 
     @Override
-    public OrderResponse getOrderById(String id) {
+    public OrderResponse getOrderById(String id, String callerId) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
+
+        // Ownership check: Khách chỉ xem đơn của mình, Admin xem tất cả
+        boolean isAdmin = org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication().getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (!isAdmin && !order.getUserId().equals(callerId)) {
+            throw new SystemException(SystemErrorCode.UNAUTHORIZED_ACTION);
+        }
+
         User user = userRepository.findById(order.getUserId()).orElse(null);
         return orderMapper.mapToResponse(order, user);
     }
@@ -221,21 +258,14 @@ public class OrderService implements IOrderService {
         }
 
         order.setStatus(OrderStatus.CANCELLED);
-        
-        // Hoàn trả lượt dùng của coupon (nếu có)
         if (order.getCouponCode() != null) {
-            couponRepository.findByCodeWithLock(order.getCouponCode()).ifPresent(coupon -> {
-                if (coupon.getUsedCount() > 0) {
-                    coupon.setUsedCount(coupon.getUsedCount() - 1);
-                    couponRepository.save(coupon);
-                }
-            });
+            releaseCouponReservation(order.getCouponCode());
         }
-        
+
         orderRepository.save(order);
         
         try {
-            notificationService.sendNotificationToTopic("admin_orders", "Đơn hàng bị huỷ!", "Đơn hàng #" + orderId.substring(0, 8) + " đã bị huỷ bởi khách hàng.", java.util.Map.of("orderId", orderId));
+            notificationService.sendNotificationToTopic("admin_orders", "Đơn hàng bị huỷ!", "Đơn hàng #" + shortOrderRef(orderId) + " đã bị huỷ bởi khách hàng.", java.util.Map.of("orderId", orderId));
         } catch (Exception e) {
             log.error("Failed to send cancellation notification to admin_orders topic: ", e);
         }
@@ -249,24 +279,27 @@ public class OrderService implements IOrderService {
 
         try {
             OrderStatus newStatus = OrderStatus.valueOf(status.toUpperCase());
+            OrderStatus previousStatus = order.getStatus();
 
             // Kiểm tra luồng chuyển trạng thái hợp lệ
-            Set<OrderStatus> allowedStatuses = VALID_TRANSITIONS.getOrDefault(order.getStatus(), Set.of());
+            Set<OrderStatus> allowedStatuses = VALID_TRANSITIONS.getOrDefault(previousStatus, Set.of());
             if (!allowedStatuses.contains(newStatus)) {
                 throw new SystemException(SystemErrorCode.INVALID_ORDER_STATUS_TRANSITION);
             }
 
+            if (newStatus == OrderStatus.PAID && previousStatus == OrderStatus.PENDING && order.getCouponCode() != null) {
+                consumeCouponOnPaid(order.getCouponCode());
+            }
+
             order.setStatus(newStatus);
 
-        // C-1 FIX: Hoàn trả coupon khi Admin chuyển đơn sang CANCELLED (bất kể trạng thái cũ)
-        if (newStatus == OrderStatus.CANCELLED && order.getCouponCode() != null) {
-            couponRepository.findByCodeWithLock(order.getCouponCode()).ifPresent(coupon -> {
-                if (coupon.getUsedCount() > 0) {
-                    coupon.setUsedCount(coupon.getUsedCount() - 1);
-                    couponRepository.save(coupon);
+            if (newStatus == OrderStatus.CANCELLED && order.getCouponCode() != null) {
+                if (previousStatus == OrderStatus.PENDING) {
+                    releaseCouponReservation(order.getCouponCode());
+                } else if (couponUsageCommitted(previousStatus)) {
+                    refundCouponPaidUsage(order.getCouponCode());
                 }
-            });
-        }
+            }
 
         } catch (IllegalArgumentException e) {
             throw new SystemException(SystemErrorCode.INVALID_PARAMETER);
@@ -277,14 +310,14 @@ public class OrderService implements IOrderService {
         // Báo cho Admin nếu đơn hàng vừa chuyển sang PAID (thanh toán thành công)
         if (order.getStatus() == OrderStatus.PAID) {
             try {
-                notificationService.sendNotificationToTopic("admin_orders", "Đơn hàng đã thanh toán!", "Đơn hàng #" + orderId.substring(0, 8) + " vừa được thanh toán thành công.", java.util.Map.of("orderId", orderId));
+                notificationService.sendNotificationToTopic("admin_orders", "Đơn hàng đã thanh toán!", "Đơn hàng #" + shortOrderRef(orderId) + " vừa được thanh toán thành công.", java.util.Map.of("orderId", orderId));
             } catch (Exception e) {
                 log.error("Failed to send PAID notification to admin_orders topic: ", e);
             }
         }
 
         // Gửi Notification cho khách hàng qua FCM và lưu vào DB
-        String title = "Cập nhật đơn hàng #" + orderId.substring(0, 8);
+        String title = "Cập nhật đơn hàng #" + shortOrderRef(orderId);
         String body = getNotificationBodyForStatus(status.toUpperCase());
         
         User user = userRepository.findById(order.getUserId()).orElse(null);
@@ -301,6 +334,65 @@ public class OrderService implements IOrderService {
         notificationService.sendNotificationToUser(order.getUserId(), title, body, java.util.Map.of("orderId", orderId));
     }
 
+    /** Coupon đã được tính used sau khi thanh toán (PAID). */
+    private static boolean couponUsageCommitted(OrderStatus status) {
+        return status == OrderStatus.PAID
+                || status == OrderStatus.PREPARING
+                || status == OrderStatus.DELIVERING
+                || status == OrderStatus.COMPLETED;
+    }
+
+    private static int nz(Integer v) {
+        return v != null ? v : 0;
+    }
+
+    private static String shortOrderRef(String orderId) {
+        if (orderId == null || orderId.isEmpty()) {
+            return "?";
+        }
+        return orderId.substring(0, Math.min(8, orderId.length()));
+    }
+
+    /** Huỷ slot đặt trước khi đơn vẫn PENDING (khách huỷ hoặc admin huỷ từ PENDING). */
+    private void releaseCouponReservation(String couponCode) {
+        couponRepository.findByCodeWithLock(couponCode).ifPresent(coupon -> {
+            int r = nz(coupon.getReservedCount());
+            if (r > 0) {
+                coupon.setReservedCount(r - 1);
+                couponRepository.save(coupon);
+            }
+        });
+    }
+
+    /** Chuyển giữ chỗ → đã dùng sau thanh toán (PAID). */
+    private void consumeCouponOnPaid(String couponCode) {
+        Coupon coupon = couponRepository.findByCodeWithLock(couponCode)
+                .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
+        if (!coupon.getIsActive() || coupon.getExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new SystemException(SystemErrorCode.COUPON_EXPIRED);
+        }
+        int reserved = nz(coupon.getReservedCount());
+        if (reserved > 0) {
+            coupon.setReservedCount(reserved - 1);
+        }
+        int used = nz(coupon.getUsedCount());
+        if (coupon.getUsageLimit() != null && used >= coupon.getUsageLimit()) {
+            throw new SystemException(SystemErrorCode.COUPON_USAGE_LIMIT);
+        }
+        coupon.setUsedCount(used + 1);
+        couponRepository.save(coupon);
+    }
+
+    /** Hoàn lượt đã thanh toán khi huỷ đơn sau PAID. */
+    private void refundCouponPaidUsage(String couponCode) {
+        couponRepository.findByCodeWithLock(couponCode).ifPresent(coupon -> {
+            if (nz(coupon.getUsedCount()) > 0) {
+                coupon.setUsedCount(nz(coupon.getUsedCount()) - 1);
+                couponRepository.save(coupon);
+            }
+        });
+    }
+
     private String getNotificationBodyForStatus(String status) {
         return switch (status) {
             case "PAID" -> "Đơn hàng của bạn đã được thanh toán thành công!";
@@ -315,14 +407,27 @@ public class OrderService implements IOrderService {
     @Override
     public Page<OrderResponse> getAllOrders(String status, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
+        Page<Order> ordersPage;
+
         if (status != null && !status.isBlank()) {
             try {
                 OrderStatus orderStatus = OrderStatus.valueOf(status.toUpperCase());
-                return orderRepository.findAllByStatus(orderStatus, pageable).map(orderMapper::mapToResponse);
+                ordersPage = orderRepository.findAllByStatus(orderStatus, pageable);
             } catch (IllegalArgumentException e) {
                 throw new SystemException(SystemErrorCode.INVALID_PARAMETER); // m-4 FIX: return 400 not empty page
             }
+        } else {
+            ordersPage = orderRepository.findAll(pageable);
         }
-        return orderRepository.findAll(pageable).map(orderMapper::mapToResponse);
+
+        // Batch-fetch all users for this page in one query — avoids N+1 and "Κηόνγ rõ" customer names
+        Set<String> userIds = ordersPage.stream()
+                .map(Order::getUserId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<String, User> usersById = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+
+        return ordersPage.map(order -> orderMapper.mapToResponse(order, usersById.get(order.getUserId())));
     }
 }

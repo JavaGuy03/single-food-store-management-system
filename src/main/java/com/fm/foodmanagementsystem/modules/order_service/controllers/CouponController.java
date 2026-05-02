@@ -40,7 +40,7 @@ public class CouponController {
 
     // API Lấy danh sách cho màn hình Admin
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<List<CouponResponse>> getAllCoupons() {
         return ApiResponse.<List<CouponResponse>>builder()
                 .result(couponService.getAllCoupons())

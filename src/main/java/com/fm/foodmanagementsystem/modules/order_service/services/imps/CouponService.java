@@ -4,11 +4,13 @@ import com.fm.foodmanagementsystem.core.exception.SystemException;
 import com.fm.foodmanagementsystem.core.exception.enums.SystemErrorCode;
 import com.fm.foodmanagementsystem.modules.order_service.mappers.CouponMapper;
 import com.fm.foodmanagementsystem.modules.order_service.models.entities.Coupon;
+import com.fm.foodmanagementsystem.modules.order_service.models.enums.OrderStatus;
 import com.fm.foodmanagementsystem.modules.order_service.models.repositories.CouponRepository;
+import com.fm.foodmanagementsystem.modules.order_service.models.repositories.OrderRepository;
 import com.fm.foodmanagementsystem.modules.order_service.resources.requests.CouponRequest;
 import com.fm.foodmanagementsystem.modules.order_service.resources.responses.CouponResponse;
 import com.fm.foodmanagementsystem.modules.order_service.services.interfaces.ICouponService;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -22,6 +24,7 @@ import java.util.List;
 public class CouponService implements ICouponService {
 
     CouponRepository couponRepository;
+    OrderRepository orderRepository;
     CouponMapper couponMapper;
 
     @Override
@@ -46,7 +49,31 @@ public class CouponService implements ICouponService {
     public CouponResponse getCouponByCode(String code) {
         Coupon coupon = couponRepository.findByCode(code.toUpperCase())
                 .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
-        return couponMapper.mapToResponse(coupon);
+
+        // Validate: khách không nên thấy coupon hết hạn hoặc bị tắt
+        if (!coupon.getIsActive() || coupon.getExpiresAt().isBefore(java.time.LocalDateTime.now())) {
+            throw new SystemException(SystemErrorCode.COUPON_EXPIRED);
+        }
+        int used = coupon.getUsedCount() != null ? coupon.getUsedCount() : 0;
+        int reserved = coupon.getReservedCount() != null ? coupon.getReservedCount() : 0;
+        if (coupon.getUsageLimit() != null && used + reserved >= coupon.getUsageLimit()) {
+            throw new SystemException(SystemErrorCode.COUPON_USAGE_LIMIT);
+        }
+
+        // Trả về thông tin khuyến mãi — ẩn usedCount/isActive (dữ liệu nội bộ của admin)
+        return CouponResponse.builder()
+                .id(coupon.getId())
+                .code(coupon.getCode())
+                .discountType(coupon.getDiscountType())
+                .discountValue(coupon.getDiscountValue())
+                .minOrderValue(coupon.getMinOrderValue())
+                .maxDiscount(coupon.getMaxDiscount())
+                .expiresAt(coupon.getExpiresAt())
+                .usageLimit(null)  // Ẩn
+                .usedCount(null)   // Ẩn
+                .reservedCount(null)
+                .isActive(null)    // Ẩn
+                .build();
     }
 
     @Override
@@ -70,6 +97,12 @@ public class CouponService implements ICouponService {
             coupon.setIsActive(request.isActive());
         }
 
+        int used = coupon.getUsedCount() != null ? coupon.getUsedCount() : 0;
+        int reserved = coupon.getReservedCount() != null ? coupon.getReservedCount() : 0;
+        if (coupon.getUsageLimit() != null && coupon.getUsageLimit() < used + reserved) {
+            throw new SystemException(SystemErrorCode.INVALID_PARAMETER);
+        }
+
         return couponMapper.mapToResponse(couponRepository.save(coupon));
     }
 
@@ -83,9 +116,14 @@ public class CouponService implements ICouponService {
     @Override
     @Transactional
     public void deleteCoupon(String id) {
-        if (!couponRepository.existsById(id)) {
-            throw new SystemException(SystemErrorCode.DATA_NOT_FOUND);
+        Coupon coupon = couponRepository.findById(id)
+                .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
+
+        int reserved = coupon.getReservedCount() != null ? coupon.getReservedCount() : 0;
+        if (reserved > 0 || orderRepository.existsByCouponCodeAndStatus(coupon.getCode(), OrderStatus.PENDING)) {
+            throw new SystemException(SystemErrorCode.DATA_IS_IN_USE);
         }
-        couponRepository.deleteById(id);
+
+        couponRepository.delete(coupon);
     }
 }

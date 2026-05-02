@@ -14,5 +14,6 @@ public record CouponResponse(
         LocalDateTime expiresAt,
         Integer usageLimit,
         Integer usedCount,
+        Integer reservedCount,
         Boolean isActive
 ) {}

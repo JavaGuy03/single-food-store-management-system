@@ -32,6 +32,14 @@ public class OptionController {
                 .build();
     }
 
+    @GetMapping("/admin/food/{foodId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<List<OptionGroupResponse>> getByFoodIdForAdmin(@PathVariable Long foodId) {
+        return ApiResponse.<List<OptionGroupResponse>>builder()
+                .result(optionService.getOptionsByFoodIdForAdmin(foodId))
+                .build();
+    }
+
     @GetMapping("/food/{foodId}")
     public ApiResponse<List<OptionGroupResponse>> getByFoodId(@PathVariable Long foodId) {
         return ApiResponse.<List<OptionGroupResponse>>builder()
