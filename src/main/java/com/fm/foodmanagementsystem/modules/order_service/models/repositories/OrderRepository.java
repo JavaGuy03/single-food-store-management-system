@@ -4,8 +4,10 @@ import com.fm.foodmanagementsystem.modules.order_service.models.entities.Order;
 import com.fm.foodmanagementsystem.modules.order_service.models.enums.OrderStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -22,6 +24,11 @@ public interface OrderRepository extends JpaRepository<Order, String> {
 
     @EntityGraph(attributePaths = {"orderItems", "orderItems.food"})
     java.util.Optional<Order> findById(String id);
+
+    /** Khóa dòng đơn để tránh hai luồng cùng chuyển PENDING→PAID (coupon / trạng thái). */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT o FROM Order o WHERE o.id = :id")
+    java.util.Optional<Order> findByIdForUpdate(@Param("id") String id);
 
     @EntityGraph(attributePaths = {"orderItems", "orderItems.food"})
     Page<Order> findAllByStatus(OrderStatus status, Pageable pageable);

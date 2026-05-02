@@ -28,6 +28,10 @@ public enum SystemErrorCode {
     USER_DISABLED(1015, "This account has been disabled!", HttpStatus.FORBIDDEN),
     UNAUTHORIZED_ACTION(1016, "You are not authorized to perform this action!", HttpStatus.FORBIDDEN),
     STORE_CLOSED(1017, "The restaurant is not accepting orders right now.", HttpStatus.BAD_REQUEST),
+    PAYMENT_REQUIRES_REVIEW(
+            1018,
+            "Payment may have succeeded but order could not be confirmed. Contact support before paying again.",
+            HttpStatus.CONFLICT),
 
     ;
     int code;

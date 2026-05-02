@@ -294,11 +294,17 @@ public class OrderService implements IOrderService {
     @Override
     @Transactional
     public void updateOrderStatus(String orderId, String status) {
-        Order order = orderRepository.findById(orderId).orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
 
         try {
             OrderStatus newStatus = OrderStatus.valueOf(status.toUpperCase());
             OrderStatus previousStatus = order.getStatus();
+
+            // Hai luồng thanh toán/query cùng lúc: luồng sau thấy PAID và thoát không ném INVALID_TRANSITION.
+            if (previousStatus == newStatus) {
+                return;
+            }
 
             // Kiểm tra luồng chuyển trạng thái hợp lệ
             Set<OrderStatus> allowedStatuses = VALID_TRANSITIONS.getOrDefault(previousStatus, Set.of());

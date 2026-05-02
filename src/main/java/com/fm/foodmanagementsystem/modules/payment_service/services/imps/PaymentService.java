@@ -42,6 +42,7 @@ import java.util.*;
  *   <li>Sau khi user thanh toán trên app ZaloPay, app <strong>bắt buộc gọi</strong> {@link #queryZaloPayOrder} với {@code app_trans_id} (hoặc đợi cron server, tối đa ~2 phút sau 1 phút)</li>
  *   <li>{@link #pollPendingTransactions} chạy định kỳ, gọi query cho mọi giao dịch PENDING (không JWT → bỏ qua kiểm tra chủ giao dịch)</li>
  * </ul>
+ * {@code RECONCILE_REQUIRED} + {@code ORDER_PAID_CONFIRM_FAILED}: cổ ZaloPay thành công nhưng không ghi PAID đơn (coupon…) — không treo PENDING; app hiển thị liên hệ hỗ trợ, không thanh toán lại đến khi xử lý.
  */
 @Service
 @Slf4j
@@ -53,6 +54,7 @@ public class PaymentService implements IPaymentService {
     IOrderService orderService;
     OrderRepository orderRepository;
     PaymentTransactionRepository paymentTransactionRepository;
+    PaymentTransactionCommitService paymentTransactionCommitService;
 
     // C4: Đánh dấu @NonFinal để Lombok không yêu cầu inject qua constructor
     @NonFinal
@@ -81,6 +83,9 @@ public class PaymentService implements IPaymentService {
         boolean hasPendingTx = paymentTransactionRepository.existsByOrderIdAndStatus(orderId, "PENDING");
         if (hasPendingTx) {
             throw new SystemException(SystemErrorCode.DATA_IS_IN_USE);
+        }
+        if (paymentTransactionRepository.existsByOrderIdAndStatus(orderId, "RECONCILE_REQUIRED")) {
+            throw new SystemException(SystemErrorCode.PAYMENT_REQUIRES_REVIEW);
         }
 
         long amountVnd = resolveAndSyncChargeAmountVnd(dbOrder);
@@ -215,10 +220,13 @@ public class PaymentService implements IPaymentService {
                                 orderService.updateOrderStatus(orderId, "PAID");
                             } catch (SystemException e) {
                                 log.error(
-                                        "orderId={}: ZaloPay báo thành công nhưng không chuyển PAID được — kiểm tra coupon/hạn mức/ghi đơn thủ công. errorCode={}",
+                                        "orderId={}: ZaloPay báo thành công nhưng không chuyển PAID được — ghi RECONCILE_REQUIRED, không retry vô hạn. errorCode={}",
                                         orderId,
                                         e.getErrorCode());
-                                throw e;
+                                paymentTransactionCommitService.updateStatusStandalone(
+                                        appTransId, "RECONCILE_REQUIRED", zpTransId);
+                                response.put("order_status_update", "ORDER_PAID_CONFIRM_FAILED");
+                                return response;
                             }
                             updateTransactionStatus(appTransId, "SUCCESS", zpTransId);
                             response.put("order_status_update", "SUCCESS");

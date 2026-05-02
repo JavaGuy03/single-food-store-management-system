@@ -38,8 +38,9 @@ public class PaymentTransaction {
     @Column(name = "zp_trans_id")
     String zpTransId; // Mã giao dịch do ZaloPay sinh ra (Có khi thanh toán thành công)
 
+    /** PENDING, SUCCESS, FAILED, REFUNDED, RECONCILE_REQUIRED — cổ báo đã charge nhưng đơn chưa PAID được. */
     @Column(nullable = false)
-    String status; // PENDING, SUCCESS, FAILED, REFUNDED
+    String status;
 
     @Column(name = "created_at")
     LocalDateTime createdAt;
