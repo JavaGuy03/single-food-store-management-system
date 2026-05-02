@@ -30,6 +30,7 @@ public class UserDeviceController {
     }
 
     @DeleteMapping("/unregister")
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<Void> unregisterDevice(@RequestParam String fcmToken) {
         deviceService.unregisterDevice(fcmToken);
         return ApiResponse.<Void>builder().build();

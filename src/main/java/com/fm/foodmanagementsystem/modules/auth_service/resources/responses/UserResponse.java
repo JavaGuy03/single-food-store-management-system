@@ -23,6 +23,8 @@ public record UserResponse(
 
         Boolean isActive,
 
-        List<String> roles
+        List<String> roles,
+
+        String avatarUrl
 ) {
 }

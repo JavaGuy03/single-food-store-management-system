@@ -70,8 +70,10 @@ public class UserAddressService implements IUserAddressService {
         address.setLongitude(request.longitude());
 
         if (Boolean.TRUE.equals(request.isDefault()) && !address.getIsDefault()) {
+            List<UserAddress> others = addressRepository.findAllByUserId(userId)
+                    .stream().filter(a -> !a.getId().equals(addressId)).toList();
+            resetOtherDefaults(others);
             address.setIsDefault(true);
-            resetOtherDefaults(addressRepository.findAllByUserId(userId));
         }
 
         return mapToResponse(addressRepository.save(address));
@@ -95,8 +97,11 @@ public class UserAddressService implements IUserAddressService {
                 .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
 
         if (!targetAddress.getIsDefault()) {
+            // Reset other addresses FIRST (exclude target to avoid overwriting it)
+            List<UserAddress> others = addressRepository.findAllByUserId(userId)
+                    .stream().filter(a -> !a.getId().equals(addressId)).toList();
+            resetOtherDefaults(others);
             targetAddress.setIsDefault(true);
-            resetOtherDefaults(addressRepository.findAllByUserId(userId));
             addressRepository.save(targetAddress);
         }
     }

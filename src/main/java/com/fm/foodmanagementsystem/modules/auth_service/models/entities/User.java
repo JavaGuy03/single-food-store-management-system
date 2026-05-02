@@ -47,4 +47,7 @@ public class User {
 
     @ManyToMany
     Set<Role> roles;
+
+    @Column(name = "avatar_url")
+    String avatarUrl;
 }

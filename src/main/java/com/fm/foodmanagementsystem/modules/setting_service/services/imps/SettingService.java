@@ -23,13 +23,14 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-@FieldDefaults(level = AccessLevel.PRIVATE)
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class SettingService implements ISettingService {
 
     final StoreSettingRepository storeSettingRepository;
     final BannerRepository bannerRepository;
     final IFileService fileService;
 
+    @lombok.experimental.NonFinal
     @Value("${openapi.service.url:http://localhost:8080}")
     String serverUrl;
 
@@ -74,7 +75,7 @@ public class SettingService implements ISettingService {
     @Transactional
     public BannerResponse createBanner(BannerRequest request) {
         if (request.file() == null || request.file().isEmpty()) {
-            throw new SystemException(SystemErrorCode.UNCATEGORIZED_EXCEPTION); // Could use a specific MISSING_FILE code
+            throw new SystemException(SystemErrorCode.INVALID_PARAMETER); // C-3 FIX: 400 not 500
         }
 
         String imageName = fileService.uploadFile(request.file());

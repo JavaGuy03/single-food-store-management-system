@@ -156,12 +156,12 @@ public class OrderService implements IOrderService {
             }
 
             double calculatedDiscount = 0.0;
-            if ("percent".equalsIgnoreCase(coupon.getDiscountType())) {
+            if ("PERCENTAGE".equalsIgnoreCase(coupon.getDiscountType())) {
                 calculatedDiscount = totalAmount * (coupon.getDiscountValue() / 100.0);
                 if (coupon.getMaxDiscount() != null && calculatedDiscount > coupon.getMaxDiscount()) {
                     calculatedDiscount = coupon.getMaxDiscount();
                 }
-            } else if ("fixed".equalsIgnoreCase(coupon.getDiscountType())) {
+            } else if ("FIXED".equalsIgnoreCase(coupon.getDiscountType())) {
                 calculatedDiscount = coupon.getDiscountValue();
             }
 
@@ -186,7 +186,9 @@ public class OrderService implements IOrderService {
             log.error("Failed to send notification to admin_orders topic: ", e);
         }
 
-        return orderMapper.mapToResponse(order);
+        // Pass already-fetched user to avoid N+1 inside mapper
+        User orderUser = userRepository.findById(userId).orElse(null);
+        return orderMapper.mapToResponse(order, orderUser);
     }
 
     @Override
@@ -200,7 +202,8 @@ public class OrderService implements IOrderService {
     public OrderResponse getOrderById(String id) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
-        return orderMapper.mapToResponse(order);
+        User user = userRepository.findById(order.getUserId()).orElse(null);
+        return orderMapper.mapToResponse(order, user);
     }
 
     @Override
@@ -254,6 +257,17 @@ public class OrderService implements IOrderService {
             }
 
             order.setStatus(newStatus);
+
+        // C-1 FIX: Hoàn trả coupon khi Admin chuyển đơn sang CANCELLED (bất kể trạng thái cũ)
+        if (newStatus == OrderStatus.CANCELLED && order.getCouponCode() != null) {
+            couponRepository.findByCodeWithLock(order.getCouponCode()).ifPresent(coupon -> {
+                if (coupon.getUsedCount() > 0) {
+                    coupon.setUsedCount(coupon.getUsedCount() - 1);
+                    couponRepository.save(coupon);
+                }
+            });
+        }
+
         } catch (IllegalArgumentException e) {
             throw new SystemException(SystemErrorCode.INVALID_PARAMETER);
         }
@@ -306,7 +320,7 @@ public class OrderService implements IOrderService {
                 OrderStatus orderStatus = OrderStatus.valueOf(status.toUpperCase());
                 return orderRepository.findAllByStatus(orderStatus, pageable).map(orderMapper::mapToResponse);
             } catch (IllegalArgumentException e) {
-                return Page.empty(pageable);
+                throw new SystemException(SystemErrorCode.INVALID_PARAMETER); // m-4 FIX: return 400 not empty page
             }
         }
         return orderRepository.findAll(pageable).map(orderMapper::mapToResponse);

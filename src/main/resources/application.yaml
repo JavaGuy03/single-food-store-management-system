@@ -37,8 +37,9 @@ spring:
 
   jpa:
     hibernate:
+      # C-4 WARNING: Change to 'validate' or 'none' in production! Use Flyway/Liquibase for prod migrations.
       ddl-auto: update
-    show-sql: true
+    show-sql: false  # m-1: Disabled to prevent schema leaks and log noise in prod
 
   security:
     oauth2:
@@ -70,7 +71,10 @@ zalo-pay:
   create-order-url: "https://sb-openapi.zalopay.vn/v2/create"
   order-status-url: "https://sb-openapi.zalopay.vn/v2/query"
   redirect-url: "http://localhost:5173/payment-result"
-  callback-url: "http://localhost:8080/zalopay/callback"
+  # C-5 NOTE: ZaloPay callback cannot reach localhost. We use the polling cron job (every 2 min)
+  # in PaymentService as the primary mechanism to confirm payments in dev.
+  # In production, replace with your real public HTTPS URL and implement POST /zalopay/callback.
+  callback-url: "http://localhost:8080/api/v1/payments/zalopay/callback"
 
 openapi:
   service:

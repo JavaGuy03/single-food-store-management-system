@@ -20,6 +20,9 @@ public interface FoodRepository extends JpaRepository<Food, Long> {
     List<Food> findAllByCategoryId(Long categoryId);
 
     @EntityGraph(attributePaths = {"category", "optionGroups", "optionGroups.items"})
+    List<Food> findAllByCategoryIdAndIsAvailableTrue(Long categoryId);
+
+    @EntityGraph(attributePaths = {"category", "optionGroups", "optionGroups.items"})
     List<Food> findAllByIsAvailableTrue();
 
     @EntityGraph(attributePaths = {"category", "optionGroups", "optionGroups.items"})

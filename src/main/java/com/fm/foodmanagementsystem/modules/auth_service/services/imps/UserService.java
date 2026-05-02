@@ -67,6 +67,7 @@ public class UserService implements IUserService {
         if (request.phone() != null) user.setPhone(request.phone());
         if (request.dob() != null) user.setDob(request.dob());
         if (request.gender() != null) user.setGender(request.gender());
+        if (request.avatarUrl() != null) user.setAvatarUrl(request.avatarUrl());
 
         if (request.password() != null && !request.password().isBlank()) {
             user.setPassword(passwordEncoder.encode(request.password()));

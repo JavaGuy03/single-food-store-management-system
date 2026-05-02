@@ -4,6 +4,7 @@ import com.fm.foodmanagementsystem.modules.order_service.models.entities.Order;
 import com.fm.foodmanagementsystem.modules.order_service.models.enums.OrderStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,7 +16,12 @@ import java.util.List;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, String> {
+    // M-3 + M-6 FIX: Eagerly fetch orderItems + food to prevent N+1 and LazyInitializationException
+    @EntityGraph(attributePaths = {"orderItems", "orderItems.food"})
     List<Order> findAllByUserId(String userId);
+
+    @EntityGraph(attributePaths = {"orderItems", "orderItems.food"})
+    java.util.Optional<Order> findById(String id);
 
     Page<Order> findAllByStatus(OrderStatus status, Pageable pageable);
 

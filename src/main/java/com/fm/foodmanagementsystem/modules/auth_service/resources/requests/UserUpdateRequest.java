@@ -19,6 +19,8 @@ public record UserUpdateRequest(
 
         LocalDate dob,
 
-        Integer gender // Đổi từ int → Integer để phân biệt null (không gửi) vs 0 (giá trị thật)
+        Integer gender, // Đổi từ int → Integer để phân biệt null (không gửi) vs 0 (giá trị thật)
+
+        String avatarUrl
 ) {
 }

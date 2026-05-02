@@ -11,6 +11,7 @@ import com.fm.foodmanagementsystem.modules.interaction_service.models.repositori
 import com.fm.foodmanagementsystem.modules.interaction_service.models.repositories.ReviewRepository;
 import com.fm.foodmanagementsystem.modules.interaction_service.resources.requests.ReviewRequest;
 import com.fm.foodmanagementsystem.modules.interaction_service.resources.responses.FavoriteResponse;
+import com.fm.foodmanagementsystem.modules.interaction_service.resources.responses.FoodRatingResponse;
 import com.fm.foodmanagementsystem.modules.interaction_service.resources.responses.ReviewResponse;
 import com.fm.foodmanagementsystem.modules.interaction_service.services.interfaces.IInteractionService;
 import com.fm.foodmanagementsystem.modules.order_service.models.entities.Order;
@@ -88,9 +89,11 @@ public class InteractionService implements IInteractionService {
     }
 
     @Override
-    public Double getFoodAverageRating(Long foodId) {
+    public FoodRatingResponse getFoodRating(Long foodId) {
         Double avg = reviewRepository.getAverageRatingByFoodId(foodId);
-        return avg != null ? Math.round(avg * 10.0) / 10.0 : 0.0;
+        Long count = reviewRepository.countByFoodId(foodId);
+        double roundedAvg = avg != null ? Math.round(avg * 10.0) / 10.0 : 0.0;
+        return new FoodRatingResponse(roundedAvg, count != null ? count : 0L);
     }
 
     @Override

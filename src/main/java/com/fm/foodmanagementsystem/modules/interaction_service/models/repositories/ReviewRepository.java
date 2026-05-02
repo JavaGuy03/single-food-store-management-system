@@ -17,5 +17,9 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     @Query("SELECT AVG(r.rating) FROM Review r JOIN r.order o JOIN o.orderItems oi WHERE oi.food.id = :foodId")
     Double getAverageRatingByFoodId(Long foodId);
 
+    // M-2 FIX: DISTINCT prevents count inflation from Cartesian JOIN across multiple order_items
+    @Query("SELECT COUNT(DISTINCT r.id) FROM Review r JOIN r.order o JOIN o.orderItems oi WHERE oi.food.id = :foodId")
+    Long countByFoodId(Long foodId);
+
     Optional<Review> findByOrderId(String orderId);
 }

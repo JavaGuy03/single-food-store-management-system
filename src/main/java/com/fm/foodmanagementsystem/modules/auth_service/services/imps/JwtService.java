@@ -160,6 +160,7 @@ public class JwtService implements IJwtService {
             result.put("accessToken", tokenPair.getAccessToken());
             result.put("refreshToken", tokenPair.getRefreshToken());
             result.put("role", buildScope(user));
+            result.put("authenticated", true);
 
             return result;
         } catch (ParseException e) {

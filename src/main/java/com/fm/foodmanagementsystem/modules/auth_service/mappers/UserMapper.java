@@ -21,6 +21,7 @@ public class UserMapper {
                 .gender(user.getGender())
                 .isActive(user.getIsActive())
                 .roles(user.getRoles() != null ? user.getRoles().stream().map(Role::getName).toList() : Collections.emptyList())
+                .avatarUrl(user.getAvatarUrl())
                 .build();
     }
 

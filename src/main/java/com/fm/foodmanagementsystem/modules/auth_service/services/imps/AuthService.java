@@ -27,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.text.ParseException;
+import java.security.SecureRandom;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -188,7 +189,7 @@ public class AuthService implements IAuthService {
     }
 
     private void generateAndSendOtp(String email, String type) {
-        String otp = String.format("%06d", new Random().nextInt(999999));
+        String otp = String.format("%06d", new SecureRandom().nextInt(1_000_000));
         String redisKey = "otp:" + type + ":" + email;
 
         redisCacheService.set(redisKey, otp, 5, TimeUnit.MINUTES);

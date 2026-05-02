@@ -18,12 +18,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -87,7 +86,8 @@ public class PaymentService implements IPaymentService {
             if (response != null) {
                 response.put("app_trans_id", appTransId); // Trả kèm cái này về cho Mobile
 
-                String userId = SecurityContextHolder.getContext().getAuthentication().getName();
+                Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+                String userId = jwt.getClaimAsString("user-id");
                 PaymentTransaction transaction = PaymentTransaction.builder()
                         .orderId(orderId)
                         .userId(userId)
@@ -107,7 +107,7 @@ public class PaymentService implements IPaymentService {
 
     // M9: Hoàn thiện logic cập nhật trạng thái đơn hàng khi thanh toán thành công
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @SuppressWarnings("unchecked")
     public Map<String, Object> queryZaloPayOrder(String appTransId) {
         String data = zaloPayConfig.getAppId() + "|" + appTransId + "|" + zaloPayConfig.getKey1();
@@ -180,20 +180,23 @@ public class PaymentService implements IPaymentService {
 
     // CRON JOB: Tự động check các giao dịch PENDING mỗi 2 phút
     @Scheduled(fixedDelay = 120000)
-    @Transactional
     public void pollPendingTransactions() {
         List<PaymentTransaction> pendingTx = paymentTransactionRepository.findByStatus("PENDING");
         if (!pendingTx.isEmpty()) {
             log.info("CronJob: Đang kiểm tra {} giao dịch ZaloPay PENDING...", pendingTx.size());
             for (PaymentTransaction tx : pendingTx) {
-                // Tránh query các giao dịch mới tạo trong vòng 1 phút qua
-                if (tx.getCreatedAt().plusMinutes(1).isBefore(java.time.LocalDateTime.now())) {
-                    queryZaloPayOrder(tx.getAppTransId());
-                }
+                try {
+                    // Tránh query các giao dịch mới tạo trong vòng 1 phút qua
+                    if (tx.getCreatedAt().plusMinutes(1).isBefore(java.time.LocalDateTime.now())) {
+                        queryZaloPayOrder(tx.getAppTransId());
+                    }
 
-                // Hủy giao dịch nếu treo quá 15 phút
-                if (tx.getCreatedAt().plusMinutes(15).isBefore(java.time.LocalDateTime.now())) {
-                    updateTransactionStatus(tx.getAppTransId(), "FAILED", null);
+                    // Hủy giao dịch nếu treo quá 15 phút
+                    if (tx.getCreatedAt().plusMinutes(15).isBefore(java.time.LocalDateTime.now())) {
+                        updateTransactionStatus(tx.getAppTransId(), "FAILED", null);
+                    }
+                } catch (Exception e) {
+                    log.error("CronJob: Lỗi khi kiểm tra giao dịch {}: {}", tx.getAppTransId(), e.getMessage());
                 }
             }
         }

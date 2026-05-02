@@ -1,5 +1,7 @@
 package com.fm.foodmanagementsystem.core.services.imps;
 
+import com.fm.foodmanagementsystem.core.exception.SystemException;
+import com.fm.foodmanagementsystem.core.exception.enums.SystemErrorCode;
 import com.fm.foodmanagementsystem.core.services.interfaces.IFileService;
 import io.minio.*;
 import lombok.RequiredArgsConstructor;
@@ -56,7 +58,7 @@ public class FileService implements IFileService {
             return fileName; // Chỉ trả về tên file để lưu vào Database
         } catch (Exception e) {
             log.error("MinIO Upload Error: ", e);
-            throw new RuntimeException("Lỗi khi upload file lên MinIO: " + e.getMessage(), e);
+            throw new SystemException(SystemErrorCode.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -71,7 +73,8 @@ public class FileService implements IFileService {
         )) {
             return stream.readAllBytes();
         } catch (Exception e) {
-            throw new RuntimeException("Không tìm thấy file: " + fileName, e);
+            log.error("Không tìm thấy file MinIO: {}", fileName, e);
+            throw new SystemException(SystemErrorCode.DATA_NOT_FOUND);
         }
     }
 

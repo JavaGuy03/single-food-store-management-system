@@ -1,12 +1,10 @@
 package com.fm.foodmanagementsystem.modules.order_service.mappers;
 
 import com.fm.foodmanagementsystem.modules.auth_service.models.entities.User;
-import com.fm.foodmanagementsystem.modules.auth_service.models.repositories.UserRepository;
 import com.fm.foodmanagementsystem.modules.order_service.models.entities.Order;
 import com.fm.foodmanagementsystem.modules.order_service.models.entities.OrderItem;
 import com.fm.foodmanagementsystem.modules.order_service.resources.responses.OrderItemResponse;
 import com.fm.foodmanagementsystem.modules.order_service.resources.responses.OrderResponse;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
@@ -14,9 +12,6 @@ import java.util.List;
 
 @Component
 public class OrderMapper {
-
-    @Autowired
-    private UserRepository userRepository;
 
     public OrderItemResponse mapToItemResponse(OrderItem item) {
         return OrderItemResponse.builder()
@@ -30,23 +25,17 @@ public class OrderMapper {
                 .build();
     }
 
-    public OrderResponse mapToResponse(Order order) {
+    /**
+     * Map an Order to response. Pass the resolved User if already available (avoids extra DB hit).
+     * Pass null if user lookup is not needed or not available.
+     */
+    public OrderResponse mapToResponse(Order order, User user) {
         List<OrderItemResponse> itemResponses = order.getOrderItems() != null
                 ? order.getOrderItems().stream().map(this::mapToItemResponse).toList()
                 : Collections.emptyList();
 
-        User user = null;
-        if (order.getUserId() != null) {
-            user = userRepository.findById(order.getUserId()).orElse(null);
-        }
-
-        String customerName = "Không rõ";
-        String customerPhone = "Không rõ";
-
-        if (user != null) {
-            customerName = user.getLastName() + " " + user.getFirstName();
-            customerPhone = user.getPhone();
-        }
+        String customerName = user != null ? (user.getLastName() + " " + user.getFirstName()) : "Không rõ";
+        String customerPhone = user != null ? user.getPhone() : "Không rõ";
 
         return OrderResponse.builder()
                 .id(order.getId())
@@ -64,4 +53,9 @@ public class OrderMapper {
                 .orderItems(itemResponses)
                 .build();
     }
-}
+
+    /** Convenience overload when user is not available (admin list, pagination). */
+    public OrderResponse mapToResponse(Order order) {
+        return mapToResponse(order, null);
+    }
+}

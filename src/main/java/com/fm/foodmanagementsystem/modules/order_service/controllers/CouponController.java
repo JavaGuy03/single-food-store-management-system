@@ -38,8 +38,9 @@ public class CouponController {
                 .build();
     }
 
-    // 👇 BỔ SUNG: API Lấy danh sách cho màn hình Admin
+    // API Lấy danh sách cho màn hình Admin
     @GetMapping
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<List<CouponResponse>> getAllCoupons() {
         return ApiResponse.<List<CouponResponse>>builder()
                 .result(couponService.getAllCoupons())

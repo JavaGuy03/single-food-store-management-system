@@ -9,7 +9,9 @@ import lombok.experimental.FieldDefaults;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "favorites")
+@Table(name = "favorites", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_favorites_user_food", columnNames = {"user_id", "food_id"})
+})
 @Getter
 @Setter
 @NoArgsConstructor

@@ -66,7 +66,7 @@ public class FoodService implements IFoodService {
 
     @Override
     public List<FoodResponse> getFoodsByCategory(Long categoryId) {
-        return foodRepository.findAllByCategoryId(categoryId).stream()
+        return foodRepository.findAllByCategoryIdAndIsAvailableTrue(categoryId).stream()
                 .map(food -> foodMapper.mapToResponse(food, food.getOptionGroups()))
                 .toList();
     }

@@ -1,5 +1,7 @@
 package com.fm.foodmanagementsystem.modules.auth_service.controllers;
 
+import com.fm.foodmanagementsystem.core.exception.SystemException;
+import com.fm.foodmanagementsystem.core.exception.enums.SystemErrorCode;
 import com.fm.foodmanagementsystem.core.response.ApiResponse;
 import com.fm.foodmanagementsystem.modules.auth_service.resources.requests.UserCreationRequest;
 import com.fm.foodmanagementsystem.modules.auth_service.resources.requests.UserUpdateRequest;
@@ -11,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.data.domain.Page;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -32,9 +36,19 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<UserResponse> updateUser(
             @PathVariable String id,
             @RequestBody @Valid UserUpdateRequest request) {
+        // M-5: Ownership check — a user can only update their own profile
+        Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        String callerId = jwt.getClaimAsString("user-id");
+        boolean isAdmin = SecurityContextHolder.getContext().getAuthentication()
+                .getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (!isAdmin && !callerId.equals(id)) {
+            throw new SystemException(SystemErrorCode.UNAUTHORIZED_ACTION);
+        }
         return ApiResponse.<UserResponse>builder()
                 .message("Cập nhật thông tin thành công")
                 .result(userService.updateUserById(id, request))
