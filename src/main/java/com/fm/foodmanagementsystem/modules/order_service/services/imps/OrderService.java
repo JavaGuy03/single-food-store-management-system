@@ -263,7 +263,26 @@ public class OrderService implements IOrderService {
         }
 
         orderRepository.save(order);
-        
+
+        try {
+            User customer = userRepository.findById(order.getUserId()).orElse(null);
+            if (customer != null) {
+                String ref = shortOrderRef(orderId);
+                appNotificationRepository.save(AppNotification.builder()
+                        .user(customer)
+                        .title("Đơn hàng #" + ref + " đã hủy")
+                        .body("Bạn đã hủy đơn hàng thành công.")
+                        .orderId(orderId)
+                        .build());
+                notificationService.sendNotificationToUser(order.getUserId(),
+                        "Đơn hàng #" + ref + " đã hủy",
+                        "Bạn đã hủy đơn hàng thành công.",
+                        java.util.Map.of("orderId", orderId));
+            }
+        } catch (Exception e) {
+            log.error("Failed to notify customer on order cancel: ", e);
+        }
+
         try {
             notificationService.sendNotificationToTopic("admin_orders", "Đơn hàng bị huỷ!", "Đơn hàng #" + shortOrderRef(orderId) + " đã bị huỷ bởi khách hàng.", java.util.Map.of("orderId", orderId));
         } catch (Exception e) {

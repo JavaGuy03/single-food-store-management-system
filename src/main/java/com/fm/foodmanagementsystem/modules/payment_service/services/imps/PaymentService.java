@@ -6,6 +6,7 @@ import com.fm.foodmanagementsystem.modules.order_service.services.interfaces.IOr
 import com.fm.foodmanagementsystem.modules.payment_service.configs.ZaloPayConfig;
 import com.fm.foodmanagementsystem.modules.order_service.models.entities.Order;
 import com.fm.foodmanagementsystem.modules.order_service.models.entities.OrderItem;
+import com.fm.foodmanagementsystem.modules.order_service.models.enums.OrderStatus;
 import com.fm.foodmanagementsystem.modules.order_service.models.repositories.OrderRepository;
 import com.fm.foodmanagementsystem.modules.payment_service.models.entities.PaymentTransaction;
 import com.fm.foodmanagementsystem.modules.payment_service.models.repositories.PaymentTransactionRepository;
@@ -180,31 +181,49 @@ public class PaymentService implements IPaymentService {
                     Map.class);
 
             if (response != null && response.containsKey("return_code")) {
-                int returnCode = (Integer) response.get("return_code");
+                int returnCode = parseZaloPayReturnCode(response.get("return_code"));
 
                 if (returnCode == 1) {
                     // Thanh toán THÀNH CÔNG!
                     log.info("Giao dịch {} THÀNH CÔNG! Đang cập nhật trạng thái đơn hàng...", appTransId);
 
-                    // Rút orderId từ embed_data
                     String orderId = extractOrderIdFromTransaction(appTransId);
+                    String zpTransId = response.containsKey("zp_trans_id")
+                            ? String.valueOf(response.get("zp_trans_id"))
+                            : null;
 
                     if (orderId != null) {
-                        try {
-                            orderService.updateOrderStatus(orderId, "PAID");
-                        } catch (SystemException e) {
+                        Optional<Order> orderOpt = orderRepository.findById(orderId);
+                        if (orderOpt.isPresent() && orderOpt.get().getStatus() == OrderStatus.PAID) {
+                            // Idempotent: khách/cron query lại sau khi đơn đã PAID — tránh ném INVALID_TRANSITION và treo tx PENDING
+                            updateTransactionStatus(appTransId, "SUCCESS", zpTransId);
+                            response.put("order_status_update", "SUCCESS");
+                            log.info("Đơn {} đã PAID — khóa tx {} SUCCESS (idempotent query)", orderId, appTransId);
+                        } else if (orderOpt.isPresent() && orderOpt.get().getStatus() == OrderStatus.CANCELLED) {
+                            // Khách huỷ đơn trong lúc đang thanh toán — tiền có thể đã vào ZaloPay nhưng không được PAID đơn
                             log.error(
-                                    "orderId={}: ZaloPay báo thành công nhưng không chuyển PAID được — kiểm tra coupon/hạn mức/ghi đơn thủ công. errorCode={}",
+                                    "orderId={}: ZaloPay báo thành công nhưng đơn đã CANCELLED — cần hoàn tiền / đối soát thủ công. appTransId={}",
                                     orderId,
-                                    e.getErrorCode());
-                            throw e;
+                                    appTransId);
+                            updateTransactionStatus(appTransId, "SUCCESS", zpTransId);
+                            response.put("order_status_update", "ORDER_CANCELLED_PAYMENT_RECEIVED");
+                        } else if (orderOpt.isEmpty()) {
+                            log.warn("Không tìm thấy orderId={} cho giao dịch {}", orderId, appTransId);
+                            response.put("order_status_update", "ORDER_NOT_FOUND");
+                        } else {
+                            try {
+                                orderService.updateOrderStatus(orderId, "PAID");
+                            } catch (SystemException e) {
+                                log.error(
+                                        "orderId={}: ZaloPay báo thành công nhưng không chuyển PAID được — kiểm tra coupon/hạn mức/ghi đơn thủ công. errorCode={}",
+                                        orderId,
+                                        e.getErrorCode());
+                                throw e;
+                            }
+                            updateTransactionStatus(appTransId, "SUCCESS", zpTransId);
+                            response.put("order_status_update", "SUCCESS");
+                            log.info("Đã cập nhật đơn hàng {} sang trạng thái PAID", orderId);
                         }
-                        String zpTransId = response.containsKey("zp_trans_id")
-                                ? String.valueOf(response.get("zp_trans_id"))
-                                : null;
-                        updateTransactionStatus(appTransId, "SUCCESS", zpTransId);
-                        response.put("order_status_update", "SUCCESS");
-                        log.info("Đã cập nhật đơn hàng {} sang trạng thái PAID", orderId);
                     } else {
                         log.warn("Không tìm thấy orderId cho giao dịch {}", appTransId);
                         response.put("order_status_update", "ORDER_NOT_FOUND");
@@ -222,6 +241,21 @@ public class PaymentService implements IPaymentService {
     }
 
     // Helper: Tìm orderId từ PaymentTransaction đã lưu
+    /** API ZaloPay có thể trả {@code return_code} kiểu Integer/Long/BigDecimal tùy client JSON. */
+    private static int parseZaloPayReturnCode(Object raw) {
+        if (raw instanceof Number n) {
+            return n.intValue();
+        }
+        if (raw instanceof String s) {
+            try {
+                return Integer.parseInt(s.trim());
+            } catch (NumberFormatException ignored) {
+                return Integer.MIN_VALUE;
+            }
+        }
+        return Integer.MIN_VALUE;
+    }
+
     private String extractOrderIdFromTransaction(String appTransId) {
         return paymentTransactionRepository.findByAppTransId(appTransId)
                 .map(PaymentTransaction::getOrderId)
