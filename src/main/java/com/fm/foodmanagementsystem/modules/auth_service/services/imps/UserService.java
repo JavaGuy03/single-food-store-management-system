@@ -2,6 +2,7 @@ package com.fm.foodmanagementsystem.modules.auth_service.services.imps;
 
 import com.fm.foodmanagementsystem.core.exception.SystemException;
 import com.fm.foodmanagementsystem.core.exception.enums.SystemErrorCode;
+import com.fm.foodmanagementsystem.core.util.EmailUtils;
 import com.fm.foodmanagementsystem.modules.auth_service.mappers.UserMapper;
 import com.fm.foodmanagementsystem.modules.auth_service.models.entities.Role;
 import com.fm.foodmanagementsystem.modules.auth_service.models.entities.User;
@@ -40,11 +41,13 @@ public class UserService implements IUserService {
 
     @Override
     public UserResponse createUser(UserCreationRequest request) {
-        if (userRepository.existsByEmail(request.email())) {
+        String email = EmailUtils.normalize(request.email());
+        if (userRepository.existsByEmailIgnoreCase(email)) {
             throw new SystemException(SystemErrorCode.USER_EXISTED);
         }
 
         User user = userMapper.mapToUser(request);
+        user.setEmail(email);
         user.setPassword(passwordEncoder.encode(request.password()));
 
         if (request.roles() != null && !request.roles().isEmpty()) {

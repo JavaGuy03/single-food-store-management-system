@@ -12,4 +12,6 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
     Optional<PaymentTransaction> findByAppTransId(String appTransId);
     List<PaymentTransaction> findByStatus(String status);
     boolean existsByOrderIdAndStatus(String orderId, String status);
+
+    List<PaymentTransaction> findByOrderIdAndStatus(String orderId, String status);
 }

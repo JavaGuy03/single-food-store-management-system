@@ -18,6 +18,10 @@ public interface UserRepository extends JpaRepository<User, String> {
 
     Optional<User> findByEmail(String email);
 
+    boolean existsByEmailIgnoreCase(String email);
+
+    Optional<User> findByEmailIgnoreCase(String email);
+
     @EntityGraph(attributePaths = "roles")
     Page<User> findAll(Pageable pageable);
 

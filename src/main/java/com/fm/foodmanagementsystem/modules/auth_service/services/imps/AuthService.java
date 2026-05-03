@@ -2,6 +2,8 @@ package com.fm.foodmanagementsystem.modules.auth_service.services.imps;
 
 import com.fm.foodmanagementsystem.core.exception.SystemException;
 import com.fm.foodmanagementsystem.core.exception.enums.SystemErrorCode;
+import com.fm.foodmanagementsystem.core.util.EmailUtils;
+import com.fm.foodmanagementsystem.core.util.PasswordHashUtils;
 import com.fm.foodmanagementsystem.core.services.interfaces.IEmailService;
 import com.fm.foodmanagementsystem.core.services.interfaces.IRedisCacheService;
 import com.fm.foodmanagementsystem.modules.auth_service.mappers.UserMapper;
@@ -47,7 +49,8 @@ public class AuthService implements IAuthService {
 
     @Override
     public TokenResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.email())
+        String email = EmailUtils.normalize(request.email());
+        User user = userRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new SystemException(SystemErrorCode.USER_NOT_EXISTED));
 
         // C3: Kiểm tra tài khoản có bị khóa không
@@ -55,8 +58,13 @@ public class AuthService implements IAuthService {
             throw new SystemException(SystemErrorCode.USER_DISABLED);
         }
 
-        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
+        if (!passwordMatchesLogin(request.password(), user.getPassword())) {
             throw new SystemException(SystemErrorCode.UNAUTHENTICATED);
+        }
+
+        if (!email.equals(user.getEmail())) {
+            user.setEmail(email);
+            userRepository.save(user);
         }
 
         // SỬA BỔ SUNG: Truyền cờ rememberMe từ request vào hàm sinh Token
@@ -90,12 +98,13 @@ public class AuthService implements IAuthService {
 
     @Override
     public void registerPendingUser(RegisterUserRequest request, String roleName) {
-        if (userRepository.existsByEmail(request.email())) {
+        String email = EmailUtils.normalize(request.email());
+        if (userRepository.existsByEmailIgnoreCase(email)) {
             throw new SystemException(SystemErrorCode.USER_EXISTED);
         }
 
         PendingUserDto pendingUser = PendingUserDto.builder()
-                .email(request.email())
+                .email(email)
                 .firstName(request.firstName())
                 .lastName(request.lastName())
                 .password(passwordEncoder.encode(request.password()))
@@ -105,17 +114,18 @@ public class AuthService implements IAuthService {
                 .roles(java.util.List.of(roleName))
                 .build();
 
-        redisCacheService.set("pending_user:" + request.email(), pendingUser, 15, TimeUnit.MINUTES);
+        redisCacheService.set("pending_user:" + email, pendingUser, 15, TimeUnit.MINUTES);
 
-        generateAndSendOtp(request.email(), "REGISTER");
+        generateAndSendOtp(email, "REGISTER");
     }
 
     @Override
     @Transactional
     public UserResponse verifyAndCreateUser(VerifyOtpRequest request) {
-        verifyOtp(request.email(), request.otpCode(), "REGISTER");
+        String email = EmailUtils.normalize(request.email());
+        verifyOtp(email, request.otpCode(), "REGISTER");
 
-        PendingUserDto pendingUser = redisCacheService.get("pending_user:" + request.email(), PendingUserDto.class);
+        PendingUserDto pendingUser = redisCacheService.get("pending_user:" + email, PendingUserDto.class);
         if (pendingUser == null) {
             throw new SystemException(SystemErrorCode.USER_NOT_EXISTED);
         }
@@ -140,47 +150,50 @@ public class AuthService implements IAuthService {
 
         User savedUser = userRepository.save(user);
 
-        redisCacheService.delete("pending_user:" + request.email());
-        redisCacheService.delete("otp:REGISTER:" + request.email());
+        redisCacheService.delete("pending_user:" + email);
+        redisCacheService.delete("otp:REGISTER:" + email);
 
         return userMapper.mapToUserResponse(savedUser);
     }
 
     @Override
     public void sendForgotPasswordOTP(String email) {
-        if (!userRepository.existsByEmail(email)) {
+        String normalized = EmailUtils.normalize(email);
+        if (!userRepository.existsByEmailIgnoreCase(normalized)) {
             throw new SystemException(SystemErrorCode.USER_NOT_EXISTED);
         }
-        generateAndSendOtp(email, "FORGOT_PASSWORD");
+        generateAndSendOtp(normalized, "FORGOT_PASSWORD");
     }
 
     @Override
     @Transactional
     public void resetPassword(NewPasswordRequest request) {
-        verifyOtp(request.email(), request.otpCode(), "FORGOT_PASSWORD");
+        String email = EmailUtils.normalize(request.email());
+        verifyOtp(email, request.otpCode(), "FORGOT_PASSWORD");
 
-        User user = userRepository.findByEmail(request.email())
+        User user = userRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new SystemException(SystemErrorCode.USER_NOT_EXISTED));
 
         user.setPassword(passwordEncoder.encode(request.newPassword()));
         userRepository.save(user);
 
-        redisCacheService.delete("otp:FORGOT_PASSWORD:" + request.email());
+        redisCacheService.delete("otp:FORGOT_PASSWORD:" + email);
     }
 
     @Override
     public void resendOtp(String email, String type) {
+        String normalized = EmailUtils.normalize(email);
         // Kiểm tra loại OTP để xác định luồng
         if ("REGISTER".equals(type)) {
             // Nếu là gửi lại mã đăng ký, phải kiểm tra xem user này có đang "chờ" trong Redis không
-            PendingUserDto pendingUser = redisCacheService.get("pending_user:" + email, PendingUserDto.class);
+            PendingUserDto pendingUser = redisCacheService.get("pending_user:" + normalized, PendingUserDto.class);
             if (pendingUser == null) {
                 // Nếu không có trong Redis, tức là đã quá 15 phút hoặc chưa từng đăng ký
                 throw new SystemException(SystemErrorCode.USER_NOT_EXISTED);
             }
         } else if ("FORGOT_PASSWORD".equals(type)) {
             // Nếu là gửi lại mã quên mật khẩu, kiểm tra xem user có thật trong DB không
-            if (!userRepository.existsByEmail(email)) {
+            if (!userRepository.existsByEmailIgnoreCase(normalized)) {
                 throw new SystemException(SystemErrorCode.USER_NOT_EXISTED);
             }
         } else {
@@ -188,7 +201,27 @@ public class AuthService implements IAuthService {
         }
 
         // Gọi lại hàm tiện ích để sinh mã mới đè lên mã cũ trong Redis (hạn 5 phút mới) và gửi mail
-        generateAndSendOtp(email, type);
+        generateAndSendOtp(normalized, type);
+    }
+
+    /**
+     * Đăng nhập: chỉ so khớp BCrypt hợp lệ. Hash không đúng định dạng → log cảnh báo (vận hành cần sửa DB), không lộ chi tiết cho client.
+     */
+    private boolean passwordMatchesLogin(String rawPassword, String encodedFromDb) {
+        if (encodedFromDb == null || encodedFromDb.isBlank()) {
+            return false;
+        }
+        if (!PasswordHashUtils.looksLikeBcrypt(encodedFromDb)) {
+            log.warn("Login refused: stored password for user is not a BCrypt hash (fix data or reset password). Prefix={}",
+                    encodedFromDb.length() > 12 ? encodedFromDb.substring(0, 12) + "…" : encodedFromDb);
+            return false;
+        }
+        try {
+            return passwordEncoder.matches(rawPassword, encodedFromDb);
+        } catch (IllegalArgumentException ex) {
+            log.warn("Login refused: BCrypt verification error — {}", ex.getMessage());
+            return false;
+        }
     }
 
     private void generateAndSendOtp(String email, String type) {

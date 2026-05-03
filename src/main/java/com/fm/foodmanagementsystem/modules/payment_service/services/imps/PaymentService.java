@@ -93,11 +93,9 @@ public class PaymentService implements IPaymentService {
             throw new SystemException(SystemErrorCode.INVALID_ORDER_STATUS_TRANSITION);
         }
 
-        // Chặn tạo thanh toán trùng — nếu đã có transaction PENDING cho đơn này
-        boolean hasPendingTx = paymentTransactionRepository.existsByOrderIdAndStatus(orderId, "PENDING");
-        if (hasPendingTx) {
-            throw new SystemException(SystemErrorCode.DATA_IS_IN_USE);
-        }
+        // Đã có PENDING (retry thanh toán): huỷ giao dịch cũ rồi tạo app_trans_id / token mới — không trả 409
+        supersedePendingZaloPayTransactions(orderId, callerId);
+
         if (paymentTransactionRepository.existsByOrderIdAndStatus(orderId, "RECONCILE_REQUIRED")) {
             throw new SystemException(SystemErrorCode.PAYMENT_REQUIRES_REVIEW);
         }
@@ -300,6 +298,23 @@ public class PaymentService implements IPaymentService {
             }
             paymentTransactionRepository.save(tx);
         });
+    }
+
+    /** Retry thanh toán: đóng mọi txn ZaloPay PENDING cũ của đơn (cùng chủ) để tạo token mới — không 409. */
+    private void supersedePendingZaloPayTransactions(String orderId, String userId) {
+        List<PaymentTransaction> pending = paymentTransactionRepository.findByOrderIdAndStatus(orderId, "PENDING");
+        if (pending.isEmpty()) {
+            return;
+        }
+        for (PaymentTransaction tx : pending) {
+            if (!userId.equals(tx.getUserId())) {
+                continue;
+            }
+            tx.setStatus("FAILED");
+            paymentTransactionRepository.save(tx);
+            log.info("ZaloPay create retry: superseded PENDING txn id={} appTransId={} orderId={}",
+                    tx.getId(), tx.getAppTransId(), orderId);
+        }
     }
 
     // CRON JOB: Tự động check các giao dịch PENDING mỗi 2 phút

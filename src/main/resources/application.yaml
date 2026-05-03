@@ -51,6 +51,11 @@ spring:
     serialization:
       write-dates-as-timestamps: false
 
+# LocalDateTime JSON: coi giá trị DB là giờ địa bàn này → xuất ISO có offset (+07:00) cho mobile (Flutter) parse ổn định
+app:
+  api:
+    datetime-zone: Asia/Ho_Chi_Minh
+
 logging:
   level:
     root: INFO
