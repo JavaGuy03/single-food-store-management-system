@@ -30,11 +30,11 @@ public class CouponController {
                 .build();
     }
 
-    // API này dành cho Khách hàng lúc nhập mã ở giỏ hàng (Không cần quyền Admin)
-    @GetMapping("/{code}")
-    public ApiResponse<CouponResponse> getByCode(@PathVariable String code) {
-        return ApiResponse.<CouponResponse>builder()
-                .result(couponService.getCouponByCode(code))
+    /** Danh sách mã đang hiển thị / áp dụng được — public, không cần JWT (Security: /api/v1/coupons/*). */
+    @GetMapping("/public-list")
+    public ApiResponse<List<CouponResponse>> getPublicCoupons() {
+        return ApiResponse.<List<CouponResponse>>builder()
+                .result(couponService.getPublicCouponsForDisplay())
                 .build();
     }
 
@@ -44,6 +44,14 @@ public class CouponController {
     public ApiResponse<List<CouponResponse>> getAllCoupons() {
         return ApiResponse.<List<CouponResponse>>builder()
                 .result(couponService.getAllCoupons())
+                .build();
+    }
+
+    // API này dành cho Khách hàng lúc nhập mã ở giỏ hàng (Không cần quyền Admin)
+    @GetMapping("/{code}")
+    public ApiResponse<CouponResponse> getByCode(@PathVariable String code) {
+        return ApiResponse.<CouponResponse>builder()
+                .result(couponService.getCouponByCode(code))
                 .build();
     }
 

@@ -8,6 +8,10 @@ import java.util.List;
 public interface ICouponService {
     CouponResponse createCoupon(CouponRequest request);
     CouponResponse getCouponByCode(String code);
+
+    /** Danh sách mã đang áp dụng được (không lộ số liệu nội bộ) — dùng cho app khách. */
+    List<CouponResponse> getPublicCouponsForDisplay();
+
     CouponResponse updateCoupon(String id, CouponRequest request);
     List<CouponResponse> getAllCoupons();
     void deleteCoupon(String id);

@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -60,7 +61,19 @@ public class CouponService implements ICouponService {
             throw new SystemException(SystemErrorCode.COUPON_USAGE_LIMIT);
         }
 
-        // Trả về thông tin khuyến mãi — ẩn usedCount/isActive (dữ liệu nội bộ của admin)
+        return toPublicCouponDisplay(coupon);
+    }
+
+    @Override
+    public List<CouponResponse> getPublicCouponsForDisplay() {
+        LocalDateTime now = LocalDateTime.now();
+        return couponRepository.findAllAvailableForPublicDisplay(now).stream()
+                .map(this::toPublicCouponDisplay)
+                .toList();
+    }
+
+    /** Giống payload {@link #getCouponByCode} — không trả usageLimit/usedCount/isActive cho khách. */
+    private CouponResponse toPublicCouponDisplay(Coupon coupon) {
         return CouponResponse.builder()
                 .id(coupon.getId())
                 .code(coupon.getCode())
@@ -69,10 +82,10 @@ public class CouponService implements ICouponService {
                 .minOrderValue(coupon.getMinOrderValue())
                 .maxDiscount(coupon.getMaxDiscount())
                 .expiresAt(coupon.getExpiresAt())
-                .usageLimit(null)  // Ẩn
-                .usedCount(null)   // Ẩn
+                .usageLimit(null)
+                .usedCount(null)
                 .reservedCount(null)
-                .isActive(null)    // Ẩn
+                .isActive(null)
                 .build();
     }
 
