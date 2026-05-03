@@ -7,9 +7,15 @@ import java.util.List;
 
 public interface ICouponService {
     CouponResponse createCoupon(CouponRequest request);
+    /**
+     * Tra cứu mã: hết hạn nếu {@code expiresAt.isBefore(LocalDateTime.now())} — {@code now()} là giờ máy chủ (timezone JVM).
+     */
     CouponResponse getCouponByCode(String code);
 
-    /** Danh sách mã đang áp dụng được (không lộ số liệu nội bộ) — dùng cho app khách. */
+    /**
+     * Danh sách mã đang áp dụng được (payload public, không lộ nội bộ). Lọc hết hạn dùng cùng {@code LocalDateTime.now()} với
+     * {@link #getCouponByCode(String)} — BA nên quy ước “giờ cửa hàng” với cấu hình timezone server.
+     */
     List<CouponResponse> getPublicCouponsForDisplay();
 
     CouponResponse updateCoupon(String id, CouponRequest request);

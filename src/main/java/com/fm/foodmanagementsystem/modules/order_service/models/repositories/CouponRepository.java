@@ -19,6 +19,8 @@ public interface CouponRepository extends JpaRepository<Coupon, String> {
 
     /**
      * Cùng điều kiện với {@code getCouponByCode}: đang bật, chưa hết hạn, còn lượt dùng.
+     * Tham số {@code now} phải là {@link java.time.LocalDateTime#now()} (hoặc tương đương) trên cùng timezone JVM với
+     * logic validate trong service — “chưa hết hạn” nghĩa là {@code expiresAt > now}.
      */
     @Query("""
             SELECT c FROM Coupon c

@@ -19,6 +19,10 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * Đánh giá hết hạn voucher: {@link LocalDateTime#now()} của JVM host (mặc định timezone hệ thống máy chủ).
+ * Đồng bộ với BA: coi đây là “giờ cửa hàng” khi OS/container đặt đúng zone.
+ */
 @Service
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -51,8 +55,8 @@ public class CouponService implements ICouponService {
         Coupon coupon = couponRepository.findByCode(code.toUpperCase())
                 .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
 
-        // Validate: khách không nên thấy coupon hết hạn hoặc bị tắt
-        if (!coupon.getIsActive() || coupon.getExpiresAt().isBefore(java.time.LocalDateTime.now())) {
+        // Validate: khách không nên thấy coupon hết hạn hoặc bị tắt (so với LocalDateTime.now() trên server)
+        if (!coupon.getIsActive() || coupon.getExpiresAt().isBefore(LocalDateTime.now())) {
             throw new SystemException(SystemErrorCode.COUPON_EXPIRED);
         }
         int used = coupon.getUsedCount() != null ? coupon.getUsedCount() : 0;
