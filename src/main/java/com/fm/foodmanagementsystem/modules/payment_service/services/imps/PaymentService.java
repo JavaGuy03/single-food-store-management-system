@@ -17,6 +17,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -38,7 +40,7 @@ import java.util.*;
  * Thanh toán ZaloPay: <strong>không phụ thuộc callback</strong> (callback URL thường không gọi được từ môi trường dev/ngrok).
  * Luồng đúng:
  * <ul>
- *   <li>App gọi {@link #createZaloPayOrder} → lưu {@link PaymentTransaction} PENDING + {@code app_trans_id}</li>
+ *   <li>App gọi {@link #createZaloPayOrder} → nếu Zalo {@code return_code=1} mới lưu {@link PaymentTransaction} PENDING + {@code app_trans_id}</li>
  *   <li>Sau khi user thanh toán trên app ZaloPay, app <strong>bắt buộc gọi</strong> {@link #queryZaloPayOrder} với {@code app_trans_id} (hoặc đợi cron server, tối đa ~2 phút sau 1 phút)</li>
  *   <li>{@link #pollPendingTransactions} chạy định kỳ, gọi query cho mọi giao dịch PENDING (không JWT → bỏ qua kiểm tra chủ giao dịch)</li>
  * </ul>
@@ -50,23 +52,35 @@ import java.util.*;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class PaymentService implements IPaymentService {
 
+    private static final int ZALOPAY_RETURN_SUCCESS = 1;
+
     ZaloPayConfig zaloPayConfig;
     IOrderService orderService;
     OrderRepository orderRepository;
     PaymentTransactionRepository paymentTransactionRepository;
     PaymentTransactionCommitService paymentTransactionCommitService;
 
+    /** Proxy để cron gọi {@link #queryZaloPayOrder} qua Spring — {@code REQUIRES_NEW} có hiệu lực. */
+    @NonFinal
+    IPaymentService paymentServiceSelf;
+
     // C4: Đánh dấu @NonFinal để Lombok không yêu cầu inject qua constructor
     @NonFinal
     RestTemplate restTemplate = new RestTemplate();
 
+    @Autowired
+    void setPaymentServiceSelf(@Lazy IPaymentService paymentServiceSelf) {
+        this.paymentServiceSelf = paymentServiceSelf;
+    }
+
     @Override
+    @Transactional
     public Map<String, Object> createZaloPayOrder(String orderId) {
         // Read caller identity from JWT
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         String callerId = jwt.getClaimAsString("user-id");
 
-        var dbOrder = orderRepository.findById(orderId)
+        Order dbOrder = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new SystemException(SystemErrorCode.DATA_NOT_FOUND));
 
         // Ownership check: only the order owner can initiate payment
@@ -132,19 +146,27 @@ public class PaymentService implements IPaymentService {
         try {
             Map<String, Object> response = restTemplate.postForObject(zaloPayConfig.getCreateOrderEndpoint(), request,
                     Map.class);
-            if (response != null) {
-                response.put("app_trans_id", appTransId); // Trả kèm cái này về cho Mobile
-                response.put("amount", amountVnd); // Số tiền thực thu (sau giảm giá / ship) — mobile nên hiển thị theo đây
+            if (response != null && response.containsKey("return_code")) {
+                int rc = parseZaloPayReturnCode(response.get("return_code"));
+                if (rc == ZALOPAY_RETURN_SUCCESS) {
+                    response.put("app_trans_id", appTransId); // Trả kèm cái này về cho Mobile
+                    response.put("amount", amountVnd); // Số tiền thực thu (sau giảm giá / ship)
 
-                PaymentTransaction transaction = PaymentTransaction.builder()
-                        .orderId(orderId)
-                        .userId(callerId) // Already retrieved above
-                        .amount(amountForTx)
-                        .paymentMethod("ZALOPAY")
-                        .appTransId(appTransId)
-                        .status("PENDING")
-                        .build();
-                paymentTransactionRepository.save(transaction);
+                    PaymentTransaction transaction = PaymentTransaction.builder()
+                            .orderId(orderId)
+                            .userId(callerId)
+                            .amount(amountForTx)
+                            .paymentMethod("ZALOPAY")
+                            .appTransId(appTransId)
+                            .status("PENDING")
+                            .build();
+                    paymentTransactionRepository.save(transaction);
+                } else {
+                    log.warn("ZaloPay create order thất bại: orderId={}, return_code={}, response={}",
+                            orderId, response.get("return_code"), response);
+                }
+            } else if (response != null) {
+                log.warn("ZaloPay create order thiếu return_code: orderId={}, response={}", orderId, response);
             }
             return response;
         } catch (Exception e) {
@@ -188,7 +210,7 @@ public class PaymentService implements IPaymentService {
             if (response != null && response.containsKey("return_code")) {
                 int returnCode = parseZaloPayReturnCode(response.get("return_code"));
 
-                if (returnCode == 1) {
+                if (returnCode == ZALOPAY_RETURN_SUCCESS) {
                     // Thanh toán THÀNH CÔNG!
                     log.info("Giao dịch {} THÀNH CÔNG! Đang cập nhật trạng thái đơn hàng...", appTransId);
 
@@ -289,14 +311,27 @@ public class PaymentService implements IPaymentService {
             for (PaymentTransaction tx : pendingTx) {
                 try {
                     java.time.LocalDateTime now = java.time.LocalDateTime.now();
+                    String appTransId = tx.getAppTransId();
 
-                    // Hủy giao dịch nếu treo quá 15 phút (kiểm tra TRUỚC để tránh query ZaloPay cho tx đã chết)
                     if (tx.getCreatedAt().plusMinutes(15).isBefore(now)) {
-                        log.warn("CronJob: Giao dịch {} đã quá 15 phút, đánh dấu FAILED", tx.getAppTransId());
-                        updateTransactionStatus(tx.getAppTransId(), "FAILED", null);
+                        // Happy path trễ: query Zalo một lần trước khi đóng tx FAILED
+                        if (paymentServiceSelf != null) {
+                            paymentServiceSelf.queryZaloPayOrder(appTransId);
+                        } else {
+                            queryZaloPayOrder(appTransId);
+                        }
+                        paymentTransactionRepository.findByAppTransId(appTransId).ifPresent(refreshed -> {
+                            if ("PENDING".equals(refreshed.getStatus())) {
+                                log.warn("CronJob: Giao dịch {} vẫn PENDING sau query — đánh dấu FAILED", appTransId);
+                                updateTransactionStatus(appTransId, "FAILED", null);
+                            }
+                        });
                     } else if (tx.getCreatedAt().plusMinutes(1).isBefore(now)) {
-                        // Chỉ query ZaloPay nếu giao dịch > 1 phút và chưa quá 15 phút
-                        queryZaloPayOrder(tx.getAppTransId());
+                        if (paymentServiceSelf != null) {
+                            paymentServiceSelf.queryZaloPayOrder(appTransId);
+                        } else {
+                            queryZaloPayOrder(appTransId);
+                        }
                     }
                 } catch (Exception e) {
                     log.error("CronJob: Lỗi khi kiểm tra giao dịch {}: {}", tx.getAppTransId(), e.getMessage());

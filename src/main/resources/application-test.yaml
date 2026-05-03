@@ -1,0 +1,49 @@
+# Profile "test": giá trị mặc định để chạy BE / test không cần export hết biến môi trường.
+# Chạy app:  mvn spring-boot:run -Dspring-boot.run.arguments=--spring.profiles.active=test
+# Hoặc:     java -jar ... --spring.profiles.active=test
+#
+# DB: H2 in-memory (không cần MySQL). Muốn MySQL local: ghi đè spring.datasource.* qua env hoặc sửa file này.
+# Redis: localhost — bật Redis hoặc Docker redis:6379.
+
+spring:
+  docker:
+    compose:
+      enabled: false
+
+  mail:
+    username: test@localhost
+    password: dummy
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  datasource:
+    url: jdbc:h2:mem:food_management;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+
+# JWT HS512: secret đủ dài cho dev/test (đổi khi triển khai thật).
+jwt:
+  secret: "0123456789012345678901234567890123456789012345678901234567890123"
+
+# ZaloPay — placeholder đủ dài để khởi động; thanh toán thật: đặt env ZALOPAY_* hoặc sửa giá trị.
+zalo-pay:
+  app-id: "test-app-id"
+  key1: "01234567890123456789012345678901"
+  key2: "fedcba9876543210fedcba9876543210"
+
+minio:
+  url: http://localhost:9000
+  access-key: minioadmin
+  secret-key: minioadmin
+  bucket-name: food-media
+
+openapi:
+  service:
+    url: http://localhost:8080
