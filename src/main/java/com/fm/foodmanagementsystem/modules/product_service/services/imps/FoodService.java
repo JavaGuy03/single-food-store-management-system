@@ -13,6 +13,10 @@ import com.fm.foodmanagementsystem.modules.product_service.models.repositories.O
 import com.fm.foodmanagementsystem.modules.product_service.resources.requests.FoodRequest;
 import com.fm.foodmanagementsystem.modules.product_service.resources.responses.FoodResponse;
 import com.fm.foodmanagementsystem.modules.product_service.services.interfaces.IFoodService;
+import com.fm.foodmanagementsystem.modules.interaction_service.services.interfaces.IInteractionService;
+import com.fm.foodmanagementsystem.modules.interaction_service.resources.responses.FoodRatingResponse;
+import com.fm.foodmanagementsystem.modules.interaction_service.resources.responses.ReviewResponse;
+import org.springframework.data.domain.Page;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -31,6 +35,7 @@ public class FoodService implements IFoodService {
     OptionGroupRepository optionGroupRepository;
     FoodMapper foodMapper;
     IFileService fileService;
+    IInteractionService interactionService;
 
     @Override
     @Transactional
@@ -86,7 +91,16 @@ public class FoodService implements IFoodService {
         if (!food.getIsAvailable()) {
             throw new SystemException(SystemErrorCode.DATA_NOT_FOUND);
         }
-        return foodMapper.mapToResponse(food, food.getOptionGroups());
+        FoodResponse response = foodMapper.mapToResponse(food, food.getOptionGroups());
+        
+        FoodRatingResponse ratingInfo = interactionService.getFoodRating(id);
+        Page<ReviewResponse> reviewsPage = interactionService.getReviewsByFoodId(id, 0, 3);
+        
+        return response.toBuilder()
+                .rating(ratingInfo.avgRating())
+                .totalReviews(ratingInfo.totalReviews())
+                .reviews(reviewsPage.getContent())
+                .build();
     }
 
     @Override

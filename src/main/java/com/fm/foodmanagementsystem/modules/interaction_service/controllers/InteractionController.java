@@ -44,6 +44,15 @@ public class InteractionController {
                 .build();
     }
 
+    @GetMapping("/foods/{foodId}/reviews")
+    public ApiResponse<Page<ReviewResponse>> getReviewsByFoodId(
+            @PathVariable Long foodId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ApiResponse.<Page<ReviewResponse>>builder()
+                .result(interactionService.getReviewsByFoodId(foodId, page, size))
+                .build();
+    }
     @GetMapping("/foods/{foodId}/rating")
     public ApiResponse<FoodRatingResponse> getFoodAverageRating(@PathVariable Long foodId) {
         return ApiResponse.<FoodRatingResponse>builder()

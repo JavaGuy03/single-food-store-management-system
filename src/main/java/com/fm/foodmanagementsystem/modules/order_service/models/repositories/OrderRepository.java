@@ -30,12 +30,17 @@ public interface OrderRepository extends JpaRepository<Order, String> {
     @Query("SELECT o FROM Order o WHERE o.id = :id")
     java.util.Optional<Order> findByIdForUpdate(@Param("id") String id);
 
-    @EntityGraph(attributePaths = {"orderItems", "orderItems.food"})
+    // Không dùng @EntityGraph ở đây: pagination + collection fetch gây HHH90003004.
+    // Service dùng findWithItemsByIds() để fetch orderItems riêng sau khi phân trang.
     Page<Order> findAllByStatus(OrderStatus status, Pageable pageable);
 
     @Override
-    @EntityGraph(attributePaths = {"orderItems", "orderItems.food"})
     Page<Order> findAll(Pageable pageable);
+
+    /** Bước 2 của two-query approach: load đầy đủ orderItems + food cho một tập IDs nhỏ. */
+    @EntityGraph(attributePaths = {"orderItems", "orderItems.food"})
+    @Query("SELECT DISTINCT o FROM Order o WHERE o.id IN :ids")
+    List<Order> findWithItemsByIds(@Param("ids") Collection<String> ids);
 
     boolean existsByUserIdAndStatusIn(String userId, Collection<OrderStatus> statuses);
 

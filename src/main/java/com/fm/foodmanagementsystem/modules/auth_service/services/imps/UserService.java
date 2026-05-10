@@ -24,6 +24,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -104,6 +105,7 @@ public class UserService implements IUserService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     @Cacheable(value = "userDetail", key = "#id")
     public UserResponse getUserById(String id) {
         User user = userRepository.findById(id)
@@ -115,9 +117,9 @@ public class UserService implements IUserService {
     // This eliminates the only remaining email-based (getName()) lookup in the codebase
 
     @Override
+    @Transactional(readOnly = true)
     public Page<UserResponse> getAllUsers(String search, String role, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        // Gọi hàm searchAndFilterUsers mà anh em mình định nghĩa trong UserRepository ở tin nhắn trước
         return userRepository.searchAndFilterUsers(search, role, pageable)
                 .map(userMapper::mapToUserResponse);
     }

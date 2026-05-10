@@ -15,6 +15,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -84,7 +85,16 @@ public class GlobalExceptionHandler {
                 .body(new ApiResponse<>(HttpStatus.BAD_REQUEST.value(), "Invalid request format or parameters", null));
     }
 
-    // 6. Handle Uncategorized Exception (Lỗi 500, NullPointer, DB Error...)
+    // 6. Handle Duplicate Entry (unique constraint violation in DB)
+    @ExceptionHandler(value = DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Object>> handlingDataIntegrityViolationException(DataIntegrityViolationException exception) {
+        log.warn("Data integrity violation: {}", exception.getMostSpecificCause().getMessage());
+        SystemErrorCode errorCode = SystemErrorCode.DUPLICATE_ENTRY;
+        return ResponseEntity.status(errorCode.getHttpStatusCode())
+                .body(new ApiResponse<>(errorCode.getCode(), errorCode.getMessage(), null));
+    }
+
+    // 7. Handle Uncategorized Exception (Lỗi 500, NullPointer, DB Error...)
     @ExceptionHandler(value = Exception.class)
     public ResponseEntity<ApiResponse<Object>> handlingUnknownException(Exception exception) {
         log.error("Uncategorized error: ", exception); // Nên log lỗi ra để debug

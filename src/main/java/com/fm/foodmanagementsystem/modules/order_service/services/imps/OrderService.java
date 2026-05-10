@@ -30,6 +30,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -432,27 +433,43 @@ public class OrderService implements IOrderService {
     @Override
     public Page<OrderResponse> getAllOrders(String status, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        Page<Order> ordersPage;
 
+        // Bước 1: Phân trang ở DB (không có @EntityGraph → không HHH90003004)
+        Page<Order> stubPage;
         if (status != null && !status.isBlank()) {
             try {
                 OrderStatus orderStatus = OrderStatus.valueOf(status.toUpperCase());
-                ordersPage = orderRepository.findAllByStatus(orderStatus, pageable);
+                stubPage = orderRepository.findAllByStatus(orderStatus, pageable);
             } catch (IllegalArgumentException e) {
-                throw new SystemException(SystemErrorCode.INVALID_PARAMETER); // m-4 FIX: return 400 not empty page
+                throw new SystemException(SystemErrorCode.INVALID_PARAMETER);
             }
         } else {
-            ordersPage = orderRepository.findAll(pageable);
+            stubPage = orderRepository.findAll(pageable);
         }
 
-        // Batch-fetch all users for this page in one query — avoids N+1 and "Κηόνγ rõ" customer names
-        Set<String> userIds = ordersPage.stream()
+        if (stubPage.isEmpty()) {
+            return stubPage.map(o -> orderMapper.mapToResponse(o, null));
+        }
+
+        // Bước 2: Load orderItems + food chỉ cho tập nhỏ (= page size) theo IDs
+        List<String> pageIds = stubPage.stream().map(Order::getId).toList();
+        Map<String, Order> fullOrders = orderRepository.findWithItemsByIds(pageIds).stream()
+                .collect(Collectors.toMap(Order::getId, o -> o));
+
+        // Batch-fetch users — tránh N+1 và thông tin "Không rõ"
+        Set<String> userIds = stubPage.stream()
                 .map(Order::getUserId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
         Map<String, User> usersById = userRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(User::getId, u -> u));
 
-        return ordersPage.map(order -> orderMapper.mapToResponse(order, usersById.get(order.getUserId())));
+        // Giữ thứ tự pagination gốc khi tạo response
+        List<OrderResponse> responses = stubPage.getContent().stream()
+                .map(stub -> fullOrders.getOrDefault(stub.getId(), stub))
+                .map(order -> orderMapper.mapToResponse(order, usersById.get(order.getUserId())))
+                .toList();
+
+        return new PageImpl<>(responses, pageable, stubPage.getTotalElements());
     }
 }

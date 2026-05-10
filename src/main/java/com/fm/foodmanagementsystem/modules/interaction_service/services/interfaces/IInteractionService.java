@@ -10,6 +10,7 @@ public interface IInteractionService {
     // Reviews
     ReviewResponse createReview(String userId, ReviewRequest request);
     Page<ReviewResponse> getAllReviews(int page, int size);
+    Page<ReviewResponse> getReviewsByFoodId(Long foodId, int page, int size);
     FoodRatingResponse getFoodRating(Long foodId);
 
     // Favorites

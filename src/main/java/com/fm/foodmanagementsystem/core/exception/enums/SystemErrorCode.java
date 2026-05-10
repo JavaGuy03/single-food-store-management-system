@@ -32,6 +32,7 @@ public enum SystemErrorCode {
             1018,
             "Payment may have succeeded but order could not be confirmed. Contact support before paying again.",
             HttpStatus.CONFLICT),
+    DUPLICATE_ENTRY(1019, "A record with this name already exists!", HttpStatus.CONFLICT),
 
     ;
     int code;

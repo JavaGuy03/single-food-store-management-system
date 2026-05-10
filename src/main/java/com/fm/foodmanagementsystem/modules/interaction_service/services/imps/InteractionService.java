@@ -101,6 +101,18 @@ public class InteractionService implements IInteractionService {
     }
 
     @Override
+    public Page<ReviewResponse> getReviewsByFoodId(Long foodId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Review> reviews = reviewRepository.findAllByFoodIdOrderByCreatedAtDesc(foodId, pageable);
+
+        List<ReviewResponse> content = reviews.getContent().stream()
+                .map(this::mapToReviewResponse)
+                .toList();
+
+        return new PageImpl<>(content, pageable, reviews.getTotalElements());
+    }
+
+    @Override
     public FoodRatingResponse getFoodRating(Long foodId) {
         Double avg = reviewRepository.getAverageRatingByFoodId(foodId);
         Long count = reviewRepository.countByFoodId(foodId);

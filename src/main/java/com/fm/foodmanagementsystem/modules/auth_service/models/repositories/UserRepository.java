@@ -22,7 +22,9 @@ public interface UserRepository extends JpaRepository<User, String> {
 
     Optional<User> findByEmailIgnoreCase(String email);
 
-    @EntityGraph(attributePaths = "roles")
+    // Không dùng @EntityGraph ở đây: pagination + collection fetch gây HHH90003004
+    // (Hibernate phân trang trong RAM). Roles được lazy-load trong @Transactional của service.
+    @Override
     Page<User> findAll(Pageable pageable);
 
     @EntityGraph(attributePaths = "roles")
@@ -30,7 +32,7 @@ public interface UserRepository extends JpaRepository<User, String> {
 
     Page<User> findByEmailContainingIgnoreCaseOrPhoneContainingIgnoreCase(String email, String phone, Pageable pageable);
 
-    @EntityGraph(attributePaths = "roles")
+    // Không dùng @EntityGraph ở đây (lý do như findAll). Roles lazy-load trong transaction.
     @Query("SELECT u FROM User u WHERE u.isActive = true AND " +
             "(:role IS NULL OR EXISTS (SELECT r FROM u.roles r WHERE r.name = :role)) AND " +
             "(:search IS NULL OR (" +

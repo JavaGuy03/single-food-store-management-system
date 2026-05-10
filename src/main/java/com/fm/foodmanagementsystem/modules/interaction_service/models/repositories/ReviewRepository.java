@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     Page<Review> findAllByOrderByCreatedAtDesc(Pageable pageable);
+    Page<Review> findAllByFoodIdOrderByCreatedAtDesc(Long foodId, Pageable pageable);
 
     // C-6 FIX: Direct FK query — no more Cartesian JOIN, no inflation, accurate results
     @Query("SELECT AVG(r.rating) FROM Review r WHERE r.food.id = :foodId")
