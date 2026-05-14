@@ -149,4 +149,13 @@ public class UserService implements IUserService {
         user.setIsActive(false);
         userRepository.save(user);
     }
+
+    @Override
+    @CacheEvict(value = "userDetail", key = "#id")
+    public void unlockUserById(String id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new SystemException(SystemErrorCode.USER_NOT_EXISTED));
+        user.setIsActive(true);
+        userRepository.save(user);
+    }
 }

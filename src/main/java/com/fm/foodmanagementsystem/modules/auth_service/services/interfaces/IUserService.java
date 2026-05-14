@@ -20,4 +20,6 @@ public interface IUserService {
     Page<UserResponse> getAllUsers(String search, String role, int page, int size);
 
     void deleteUserById(String id);
+
+    void unlockUserById(String id);
 }

@@ -33,7 +33,11 @@ public interface UserRepository extends JpaRepository<User, String> {
     Page<User> findByEmailContainingIgnoreCaseOrPhoneContainingIgnoreCase(String email, String phone, Pageable pageable);
 
     // Không dùng @EntityGraph ở đây (lý do như findAll). Roles lazy-load trong transaction.
-    @Query("SELECT u FROM User u WHERE u.isActive = true AND " +
+    // isActive không lọc ở đây — admin cần thấy cả tài khoản đã khoá để quản lý.
+    @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = :role AND u.isActive = true")
+    java.util.List<User> findAllActiveByRoleName(@Param("role") String role);
+
+    @Query("SELECT u FROM User u WHERE " +
             "(:role IS NULL OR EXISTS (SELECT r FROM u.roles r WHERE r.name = :role)) AND " +
             "(:search IS NULL OR (" +
             "LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) OR " +

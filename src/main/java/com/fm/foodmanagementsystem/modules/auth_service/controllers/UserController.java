@@ -106,4 +106,13 @@ public class UserController {
                 .message("Đã khoá tài khoản người dùng thành công")
                 .build();
     }
+
+    @PatchMapping("/{id}/unlock")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<String> unlockUser(@PathVariable String id) {
+        userService.unlockUserById(id);
+        return ApiResponse.<String>builder()
+                .message("Đã mở khoá tài khoản người dùng thành công")
+                .build();
+    }
 }
