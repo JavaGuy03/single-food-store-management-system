@@ -6,10 +6,8 @@ import com.fm.foodmanagementsystem.core.services.interfaces.IFileService;
 import com.fm.foodmanagementsystem.modules.product_service.mappers.FoodMapper;
 import com.fm.foodmanagementsystem.modules.product_service.models.entities.Category;
 import com.fm.foodmanagementsystem.modules.product_service.models.entities.Food;
-import com.fm.foodmanagementsystem.modules.product_service.models.entities.OptionGroup;
 import com.fm.foodmanagementsystem.modules.product_service.models.repositories.CategoryRepository;
 import com.fm.foodmanagementsystem.modules.product_service.models.repositories.FoodRepository;
-import com.fm.foodmanagementsystem.modules.product_service.models.repositories.OptionGroupRepository;
 import com.fm.foodmanagementsystem.modules.product_service.resources.requests.FoodRequest;
 import com.fm.foodmanagementsystem.modules.product_service.resources.responses.FoodResponse;
 import com.fm.foodmanagementsystem.modules.product_service.services.interfaces.IFoodService;
@@ -32,7 +30,6 @@ public class FoodService implements IFoodService {
 
     FoodRepository foodRepository;
     CategoryRepository categoryRepository;
-    OptionGroupRepository optionGroupRepository;
     FoodMapper foodMapper;
     IFileService fileService;
     IInteractionService interactionService;

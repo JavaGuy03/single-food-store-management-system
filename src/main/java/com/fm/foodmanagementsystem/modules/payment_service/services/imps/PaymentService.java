@@ -75,6 +75,7 @@ public class PaymentService implements IPaymentService {
 
     @Override
     @Transactional
+    @SuppressWarnings("unchecked")
     public Map<String, Object> createZaloPayOrder(String orderId) {
         // Read caller identity from JWT
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();

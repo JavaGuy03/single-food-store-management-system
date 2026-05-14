@@ -33,6 +33,10 @@ services:
         condition: service_started
     env_file:
       - .env
+    environment:
+      TZ: Asia/Ho_Chi_Minh
+    volumes:
+      - ./firebase-service-account.json:/app/firebase-service-account.json
     restart: on-failure
 
   ngrok:

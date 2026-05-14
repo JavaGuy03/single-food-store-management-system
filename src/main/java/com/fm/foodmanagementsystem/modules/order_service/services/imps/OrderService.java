@@ -37,6 +37,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -87,7 +88,7 @@ public class OrderService implements IOrderService {
 
         Order order = new Order();
         order.setUserId(userId);
-        order.setOrderDate(LocalDateTime.now());
+        order.setOrderDate(LocalDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh")));
         order.setStatus(OrderStatus.PENDING);
         order.setDeliveryAddress(request.deliveryAddress());
         order.setNote(request.note());

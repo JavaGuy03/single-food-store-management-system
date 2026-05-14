@@ -2,13 +2,10 @@ package com.fm.foodmanagementsystem.modules.auth_service.resources.requests;
 
 import com.fm.foodmanagementsystem.modules.auth_service.validations.constraints.PhoneConstraint;
 import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 
 import java.time.LocalDate;
-import java.util.List;
-
 public record RegisterUserRequest(
         @NotNull(message = "NOT_NULL")
         @Email(message = "INVALID_EMAIL")

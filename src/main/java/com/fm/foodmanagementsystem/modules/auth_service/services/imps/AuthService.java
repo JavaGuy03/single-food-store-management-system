@@ -18,7 +18,6 @@ import com.fm.foodmanagementsystem.modules.auth_service.resources.responses.Toke
 import com.fm.foodmanagementsystem.modules.auth_service.resources.responses.UserResponse;
 import com.fm.foodmanagementsystem.modules.auth_service.services.interfaces.IAuthService;
 import com.fm.foodmanagementsystem.modules.auth_service.services.interfaces.IJwtService;
-import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jwt.SignedJWT;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;

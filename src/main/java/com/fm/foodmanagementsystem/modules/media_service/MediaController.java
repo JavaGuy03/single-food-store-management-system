@@ -15,9 +15,8 @@ public class MediaController {
 
     private final IFileService fileService;
 
-    // API Test Upload Ảnh (Sau này sẽ gọi ngầm trong lúc tạo Food/Category)
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<String> upload(@RequestParam("file") MultipartFile file) {
         return ResponseEntity.ok(fileService.uploadFile(file));
     }

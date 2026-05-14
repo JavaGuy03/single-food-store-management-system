@@ -2,7 +2,6 @@ package com.fm.foodmanagementsystem.modules.auth_service.services.interfaces;
 
 import com.fm.foodmanagementsystem.modules.auth_service.models.dtos.TokenPair;
 import com.fm.foodmanagementsystem.modules.auth_service.models.entities.User;
-import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jwt.SignedJWT;
 
 import java.text.ParseException;
